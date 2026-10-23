@@ -1,0 +1,266 @@
+/* Descript Companion Floating UI Styles */
+
+#descript-floating-toolbar {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18, 22, 34, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.1);
+  z-index: 2147483647;
+  cursor: grab;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #ffffff;
+}
+
+#descript-floating-toolbar:active {
+  cursor: grabbing;
+}
+
+.descript-rec-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  padding-right: 4px;
+}
+
+.descript-rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: descript-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes descript-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.descript-btn-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.descript-tool-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  color: #ffffff;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.descript-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}
+
+.descript-danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.descript-finish-btn {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border: none;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  transition: all 0.15s ease;
+}
+
+.descript-finish-btn:hover {
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  transform: scale(1.03);
+}
+
+/* Webcam Bubble */
+#descript-cam-bubble {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #6366f1;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  z-index: 2147483646;
+  background: #000;
+  cursor: grab;
+}
+
+#descript-cam-bubble:active {
+  cursor: grabbing;
+}
+
+#descript-cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.descript-bubble-overlay {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.descript-bubble-pill {
+  font-size: 9px;
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 6px;
+  border-radius: 9999px;
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+/* Modal */
+#descript-completed-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#descript-completed-modal {
+  width: 520px;
+  background: #121622;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  color: #ffffff;
+}
+
+.descript-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #161b2a;
+}
+
+.descript-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.descript-logo-pill {
+  width: 22px;
+  height: 22px;
+  background: #6366f1;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+}
+
+#descript-close-modal {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.descript-modal-body {
+  padding: 20px;
+}
+
+.descript-modal-video {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 12px;
+}
+
+.descript-modal-info {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 18px;
+}
+
+.descript-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.descript-btn-secondary {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.descript-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.descript-btn-primary {
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  transition: all 0.15s ease;
+}
+
+.descript-btn-primary:hover {
+  background: #4f46e5;
+}

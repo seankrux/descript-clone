@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Descript Recorder Companion</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    }
+    body {
+      width: 340px;
+      background-color: #0e1118;
+      color: #f1f5f9;
+      padding: 16px;
+      user-select: none;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+      color: white;
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+    .brand-pill {
+      font-size: 9px;
+      font-family: monospace;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .modes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .mode-btn {
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      color: #cbd5e1;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+    .mode-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .mode-btn.active {
+      background: rgba(99, 102, 241, 0.18);
+      border-color: #6366f1;
+      color: #ffffff;
+    }
+    .mode-title {
+      font-size: 11px;
+      font-weight: 600;
+      display: block;
+      margin-top: 4px;
+    }
+    .mode-desc {
+      font-size: 9px;
+      color: #64748b;
+    }
+    .toggles-group {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 6px 12px;
+      margin-bottom: 16px;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+    .toggle-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #334155;
+      transition: .2s;
+      border-radius: 18px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 12px;
+      width: 12px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #6366f1;
+    }
+    input:checked + .slider:before {
+      transform: translateX(14px);
+    }
+    .record-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+      transition: all 0.15s ease;
+    }
+    .record-btn:hover {
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      transform: translateY(-1px);
+    }
+    .record-btn:active {
+      transform: translateY(0);
+    }
+    .rec-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: white;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .footer-link {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 10px;
+    }
+    .footer-link a {
+      color: #818cf8;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .footer-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <div class="logo-badge">D</div>
+      <div>
+        <div class="brand-title">Descript Companion</div>
+      </div>
+    </div>
+    <span class="brand-pill">V3 Sync</span>
+  </div>
+
+  <div class="section-title">Recording Surface</div>
+  <div class="modes-grid">
+    <div class="mode-btn active" data-mode="screen-cam">
+      <div class="mode-title">Screen + Cam</div>
+      <div class="mode-desc">Screen with camera bubble</div>
+    </div>
+    <div class="mode-btn" data-mode="tab">
+      <div class="mode-title">This Tab Only</div>
+      <div class="mode-desc">Tab audio & video</div>
+    </div>
+    <div class="mode-btn" data-mode="screen">
+      <div class="mode-title">Screen Only</div>
+      <div class="mode-desc">Clean desktop capture</div>
+    </div>
+    <div class="mode-btn" data-mode="cam">
+      <div class="mode-title">Camera Only</div>
+      <div class="mode-desc">Talking head video</div>
+    </div>
+  </div>
+
+  <div class="section-title">Inputs & Audio</div>
+  <div class="toggles-group">
+    <div class="toggle-row">
+      <span class="toggle-label">Microphone Audio</span>
+      <label class="switch">
+        <input type="checkbox" id="mic-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Tab / System Audio</span>
+      <label class="switch">
+        <input type="checkbox" id="sys-audio-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Circular Camera Bubble</span>
+      <label class="switch">
+        <input type="checkbox" id="cam-bubble-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <button class="record-btn" id="start-record-btn">
+    <div class="rec-dot"></div>
+    <span>Start Recording</span>
+  </button>
+
+  <div class="footer-link">
+    <a href="http://localhost:5173" target="_blank">Open Descript Web Studio ↗</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
