@@ -605,161 +605,296 @@ export const EditorView: React.FC<EditorViewProps> = ({
       {/* Toast Notification Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
-      {/* Top Header Bar */}
-      <header className="h-14 px-4 border-b border-white/[0.08] bg-[#121622] flex items-center justify-between z-20 shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-            title="Back to Projects"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
+      {/* Top Header Bar with iOS Safe Area support */}
+      <header className="pt-safe border-b border-white/[0.08] bg-[#121622] z-20 shrink-0">
+        <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={onBack}
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              title="Back to Projects"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
 
-          <div className="h-4 w-[1px] bg-white/10" />
+            <div className="h-4 w-[1px] bg-white/10 hidden xs:block" />
 
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm text-white tracking-tight">
-              {project.title}
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Synced Cloud
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
+                {project.title}
+              </span>
+              <span className="hidden sm:inline-flex text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Synced Cloud
+              </span>
+            </div>
+          </div>
+
+          {/* Center Suite Toolbar (Desktop Only) */}
+          <div className="hidden lg:flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/[0.08]">
+            {/* Underlord AI button */}
+            <button
+              onClick={() => setIsUnderlordOpen(!isUnderlordOpen)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 cursor-pointer"
+              title="Open Underlord Copilot (Cmd+K)"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Underlord</span>
+            </button>
+
+            {/* Studio Sound button */}
+            <button
+              onClick={() => setIsStudioSoundOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                studioSound.enabled
+                  ? 'bg-indigo-600/25 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="Studio Sound Remaster"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>Studio Sound</span>
+            </button>
+
+            {/* AI Eye Contact button */}
+            <button
+              onClick={() => setIsEyeContactOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                eyeContact.enabled
+                  ? 'bg-cyan-600/25 text-cyan-300 border border-cyan-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="AI Eye Contact Correction"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Eye Contact</span>
+            </button>
+
+            {/* Dynamic Captions button */}
+            <button
+              onClick={() => setIsCaptionsOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                captions.enabled
+                  ? 'bg-pink-600/25 text-pink-300 border border-pink-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="Dynamic Captions"
+            >
+              <Type className="w-3.5 h-3.5" />
+              <span>Captions</span>
+            </button>
+
+            {/* Canvas Effects & Transitions button */}
+            <button
+              onClick={() => setIsTransitionsOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                backgroundRemovalEnabled || studioLightingEnabled
+                  ? 'bg-amber-600/25 text-amber-300 border border-amber-500/30'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
+              }`}
+              title="Canvas Effects, AI Green Screen & Transitions"
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+              <span>Effects</span>
+            </button>
+
+            {/* Multicam button */}
+            <button
+              onClick={() => setIsMulticamOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              title="Multicam Director"
+            >
+              <Camera className="w-3.5 h-3.5 text-blue-400" />
+              <span>Multicam ({multicamAngles.length})</span>
+            </button>
+
+            {/* Teleprompter button */}
+            <button
+              onClick={() => setIsTeleprompterOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              title="Teleprompter Readout"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>Teleprompter</span>
+            </button>
+
+            {/* Overdub Voice Clone */}
+            <button
+              onClick={() => setIsVoiceCloningOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              title="Voice Clone & Overdub"
+            >
+              <Mic className="w-3.5 h-3.5 text-purple-400" />
+              <span>Overdub</span>
+            </button>
+
+            {/* Screen Recorder */}
+            <button
+              onClick={() => setIsRecorderOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              title="Screen & Cam Recorder"
+            >
+              <VideoIcon className="w-3.5 h-3.5 text-rose-400" />
+              <span>Record</span>
+            </button>
+          </div>
+
+          {/* Right Action buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Comments button */}
+            <button
+              onClick={() => setIsCommentsOpen(!isCommentsOpen)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer min-h-[40px]"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Comments</span>
+              {comments.length > 0 && (
+                <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
+                  {comments.length}
+                </span>
+              )}
+            </button>
+
+            {/* Aspect ratio selector */}
+            <div className="hidden sm:flex items-center bg-black/40 p-0.5 rounded-xl border border-white/[0.08]">
+              {(['16:9', '9:16', '1:1'] as AspectRatio[]).map((ratio) => (
+                <button
+                  key={ratio}
+                  onClick={() => setAspectRatio(ratio)}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-mono font-medium transition-colors cursor-pointer min-h-[32px] ${
+                    aspectRatio === ratio
+                      ? 'bg-white/10 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {ratio}
+                </button>
+              ))}
+            </div>
+
+            {/* Export Studio button */}
+            <button
+              onClick={() => setIsExportOpen(true)}
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer min-h-[44px]"
+              title="Export 4K Master, NLE XML, or Stems"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Export</span>
+              <span className="hidden sm:inline">4K</span>
+            </button>
+
+            {/* Share & Publish Viewways button */}
+            <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer min-h-[44px]"
+              title="Publish interactive viewway, generate embed code, or invite reviewers"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </button>
           </div>
         </div>
 
-        {/* Center Suite Toolbar */}
-        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/[0.08]">
-          {/* Underlord AI button */}
+        {/* Mobile Tool Shelf (Swipeable iOS Toolbar for screens < lg) */}
+        <div className="lg:hidden flex overflow-x-auto no-scrollbar gap-1.5 px-3 py-2 bg-[#0e121d] border-t border-white/[0.04] shrink-0 ios-scroll">
           <button
             onClick={() => setIsUnderlordOpen(!isUnderlordOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 cursor-pointer"
-            title="Open Underlord Copilot (Cmd+K)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-xs shrink-0 shadow-md min-h-[38px] cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Underlord</span>
           </button>
 
-          {/* Studio Sound button */}
           <button
             onClick={() => setIsStudioSoundOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer ${
               studioSound.enabled
                 ? 'bg-indigo-600/25 text-indigo-300 border border-indigo-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'
             }`}
-            title="Studio Sound Remaster"
           >
             <Volume2 className="w-3.5 h-3.5" />
             <span>Studio Sound</span>
           </button>
 
-          {/* AI Eye Contact button */}
           <button
             onClick={() => setIsEyeContactOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer ${
               eyeContact.enabled
                 ? 'bg-cyan-600/25 text-cyan-300 border border-cyan-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'
             }`}
-            title="AI Eye Contact Correction"
           >
             <Eye className="w-3.5 h-3.5" />
             <span>Eye Contact</span>
           </button>
 
-          {/* Dynamic Captions button */}
           <button
             onClick={() => setIsCaptionsOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer ${
               captions.enabled
                 ? 'bg-pink-600/25 text-pink-300 border border-pink-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                : 'bg-white/[0.04] text-slate-400 border border-white/[0.06]'
             }`}
-            title="Dynamic Captions"
           >
             <Type className="w-3.5 h-3.5" />
             <span>Captions</span>
           </button>
 
-          {/* Canvas Effects & Transitions button */}
           <button
             onClick={() => setIsTransitionsOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              backgroundRemovalEnabled || studioLightingEnabled
-                ? 'bg-amber-600/25 text-amber-300 border border-amber-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
-            }`}
-            title="Canvas Effects, AI Green Screen & Transitions"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-amber-300 text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer"
           >
             <Layers className="w-3.5 h-3.5 text-amber-400" />
             <span>Effects</span>
           </button>
 
-          {/* Multicam button */}
           <button
             onClick={() => setIsMulticamOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
-            title="Multicam Director"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-blue-300 text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer"
           >
             <Camera className="w-3.5 h-3.5 text-blue-400" />
             <span>Multicam ({multicamAngles.length})</span>
           </button>
 
-          {/* Teleprompter button */}
-          <button
-            onClick={() => setIsTeleprompterOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
-            title="Teleprompter Readout"
-          >
-            <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>Teleprompter</span>
-          </button>
-
-          {/* Overdub Voice Clone */}
           <button
             onClick={() => setIsVoiceCloningOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
-            title="Voice Clone & Overdub"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-purple-300 text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer"
           >
             <Mic className="w-3.5 h-3.5 text-purple-400" />
             <span>Overdub</span>
           </button>
 
-          {/* Screen Recorder */}
+          <button
+            onClick={() => setIsTeleprompterOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-300 text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-400" />
+            <span>Prompter</span>
+          </button>
+
           <button
             onClick={() => setIsRecorderOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
-            title="Screen & Cam Recorder"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-rose-300 text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer"
           >
             <VideoIcon className="w-3.5 h-3.5 text-rose-400" />
             <span>Record</span>
           </button>
-        </div>
 
-        {/* Right Action buttons */}
-        <div className="flex items-center gap-2">
-          {/* Comments button */}
           <button
             onClick={() => setIsCommentsOpen(!isCommentsOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-slate-300 text-xs font-semibold shrink-0 min-h-[38px] cursor-pointer"
           >
             <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Comments</span>
-            {comments.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
-                {comments.length}
-              </span>
-            )}
+            <span>Comments {comments.length > 0 && `(${comments.length})`}</span>
           </button>
 
-          {/* Aspect ratio selector */}
-          <div className="flex items-center bg-black/40 p-0.5 rounded-xl border border-white/[0.08]">
+          {/* Aspect Ratio Switcher on Mobile */}
+          <div className="flex items-center bg-black/40 p-0.5 rounded-xl border border-white/[0.08] shrink-0">
             {(['16:9', '9:16', '1:1'] as AspectRatio[]).map((ratio) => (
               <button
                 key={ratio}
                 onClick={() => setAspectRatio(ratio)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-mono font-medium transition-colors cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-mono font-medium transition-colors cursor-pointer min-h-[32px] ${
                   aspectRatio === ratio
                     ? 'bg-white/10 text-white'
                     : 'text-slate-400 hover:text-white'
@@ -769,33 +904,13 @@ export const EditorView: React.FC<EditorViewProps> = ({
               </button>
             ))}
           </div>
-
-          {/* Export Studio button */}
-          <button
-            onClick={() => setIsExportOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
-            title="Export 4K Master, NLE XML, or Stems"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export 4K</span>
-          </button>
-
-          {/* Share & Publish Viewways button */}
-          <button
-            onClick={() => setIsShareModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
-            title="Publish interactive viewway, generate embed code, or invite reviewers"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share</span>
-          </button>
         </div>
       </header>
 
-      {/* Main Workspace (Split View: Transcript Left, Video Player Right) */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Text-Based Script Editor */}
-        <div className="flex-1 flex flex-col border-r border-white/[0.08] bg-[#121622]/60 overflow-hidden">
+      {/* Main Workspace (Responsive: Column on Mobile, Split View on Desktop) */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Left: Text-Based Script Editor (Order 2 on Mobile, Order 1 on Desktop) */}
+        <div className="order-2 lg:order-1 flex-1 flex flex-col border-t lg:border-t-0 lg:border-r border-white/[0.08] bg-[#121622]/60 overflow-hidden">
           {/* Transcript Control Toolbar */}
           <div className="h-10 px-5 border-b border-white/[0.06] bg-[#121622] flex items-center justify-between text-xs text-slate-400">
             <div className="flex items-center gap-3">
@@ -848,28 +963,37 @@ export const EditorView: React.FC<EditorViewProps> = ({
           </div>
 
           {/* Transcript Document View (Strictly Chronological Speaker Turns) */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-6 text-sm leading-relaxed font-sans relative">
+          <div className="flex-1 overflow-y-auto ios-scroll p-4 sm:p-8 space-y-6 text-sm leading-relaxed font-sans relative pb-[calc(env(safe-area-inset-bottom)+40px)]">
             {/* Floating Word Action Toolbar on Word Selection */}
             {selectedWord && (
-              <div className="sticky top-0 z-30 mb-4 p-2.5 rounded-xl bg-[#181f30] border border-indigo-500/40 shadow-xl shadow-black/60 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800">
-                    {formatTime(selectedWord.start)}
-                  </span>
-                  <span className="font-bold text-white max-w-[140px] truncate">
-                    "{selectedWord.text}"
-                  </span>
-                  {selectedWord.deleted && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono">
-                      Cut
+              <div className="sticky top-0 z-30 mb-4 p-2 sm:p-2.5 rounded-2xl ios-glass border border-indigo-500/40 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+                      {formatTime(selectedWord.start)}
                     </span>
-                  )}
+                    <span className="font-bold text-white max-w-[140px] truncate">
+                      "{selectedWord.text}"
+                    </span>
+                    {selectedWord.deleted && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono">
+                        Cut
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedWordId(null)}
+                    className="sm:hidden p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                    title="Close selection"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                   <button
                     onClick={() => handleStartInlineEdit(selectedWord)}
-                    className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[44px] shrink-0"
                     title="Correct spelling without altering audio (C)"
                   >
                     <Type className="w-3.5 h-3.5 text-indigo-400" />
@@ -879,7 +1003,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   {selectedWord.deleted ? (
                     <button
                       onClick={() => restoreWord(selectedWord.id)}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer"
+                      className="px-3 py-2 rounded-xl bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer min-h-[44px] shrink-0"
                       title="Restore cut segment into video"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -888,7 +1012,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   ) : (
                     <button
                       onClick={() => deleteWord(selectedWord.id)}
-                      className="px-2.5 py-1 rounded-lg bg-rose-600/25 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer"
+                      className="px-3 py-2 rounded-xl bg-rose-600/25 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer min-h-[44px] shrink-0"
                       title="Cut word from video & skip playback (Delete / Backspace)"
                     >
                       <Scissors className="w-3.5 h-3.5" />
@@ -904,7 +1028,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                         setIsPlaying(true);
                       }
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30"
+                    className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30 min-h-[44px] shrink-0"
                     title="Play video from this word"
                   >
                     <Play className="w-3.5 h-3.5" />
@@ -913,7 +1037,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
                   <button
                     onClick={() => setIsVoiceCloningOpen(true)}
-                    className="px-2.5 py-1 rounded-lg bg-purple-600/25 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded-xl bg-purple-600/25 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer min-h-[44px] shrink-0"
                     title="Synthesize AI voice replacement"
                   >
                     <Mic className="w-3.5 h-3.5" />
@@ -925,7 +1049,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                       setCurrentTime(selectedWord.start);
                       setIsCommentsOpen(true);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer min-h-[44px] shrink-0"
                     title="Leave comment at this word timestamp"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
@@ -934,7 +1058,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
                   <button
                     onClick={() => setSelectedWordId(null)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1"
+                    className="hidden sm:flex p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1 min-h-[44px] min-w-[44px] items-center justify-center shrink-0"
                     title="Close selection"
                   >
                     <X className="w-4 h-4" />
@@ -1066,16 +1190,16 @@ export const EditorView: React.FC<EditorViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Video Canvas & Preview */}
-        <div className="flex-1 flex flex-col bg-[#080b11] relative overflow-hidden items-center justify-center p-6">
+        {/* Video Canvas & Preview (Order 1 on Mobile, Order 2 on Desktop) */}
+        <div className="order-1 lg:order-2 shrink-0 lg:flex-1 flex flex-col bg-[#080b11] relative overflow-hidden items-center justify-center p-3 sm:p-6 border-b lg:border-b-0 border-white/[0.08]">
           {/* Canvas Container with dynamic aspect ratio */}
           <div
-            className={`relative rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10 flex items-center justify-center transition-all ${
+            className={`relative rounded-xl lg:rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10 flex items-center justify-center transition-all ${
               aspectRatio === '16:9'
-                ? 'w-full max-w-2xl aspect-video'
+                ? 'w-full max-w-sm sm:max-w-md lg:max-w-2xl aspect-video max-h-[28vh] lg:max-h-none'
                 : aspectRatio === '9:16'
-                ? 'h-full max-h-[500px] aspect-[9/16]'
-                : 'w-[420px] aspect-square'
+                ? 'h-full max-h-[26vh] lg:max-h-[500px] aspect-[9/16]'
+                : 'w-[220px] sm:w-[320px] lg:w-[420px] aspect-square max-h-[26vh] lg:max-h-none'
             }`}
           >
             {/* HTML5 Video element */}

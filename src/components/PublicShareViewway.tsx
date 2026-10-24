@@ -282,119 +282,122 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
 
   return (
     <div className="flex flex-col h-screen bg-[#0e1118] text-slate-100 font-sans overflow-hidden select-none">
-      {/* Top Header Bar */}
-      <header className="h-14 px-6 border-b border-white/[0.08] bg-[#121622] flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-3">
-          {onBackToApp && (
-            <button
-              onClick={onBackToApp}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title="Return to Workspace Drive"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-xs text-white">
-              D
-            </div>
-            <span className="font-bold text-sm text-white tracking-tight">
-              {project.title}
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              Interactive Viewway
-            </span>
-          </div>
-        </div>
-
-        {/* Header Right Actions */}
-        <div className="flex items-center gap-2.5">
-          {/* Transcript Search Toggle */}
-          <div className="relative flex items-center">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search transcript..."
-              className="w-40 sm:w-56 pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:w-64 transition-all"
-            />
-            {searchQuery && (
+      {/* Top Header Bar with iOS Safe Area support */}
+      <header className="pt-safe border-b border-white/[0.08] bg-[#121622] shrink-0 z-20">
+        <div className="h-14 px-3 sm:px-6 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {onBackToApp && (
               <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 text-slate-400 hover:text-white cursor-pointer"
+                onClick={onBackToApp}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                title="Return to Workspace Drive"
               >
-                <X className="w-3.5 h-3.5" />
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-xs text-white">
+                D
+              </div>
+              <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate max-w-[120px] xs:max-w-xs">
+                {project.title}
+              </span>
+              <span className="hidden sm:inline-flex text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                Interactive Viewway
+              </span>
+            </div>
+          </div>
+
+          {/* Header Right Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {/* Transcript Search Toggle */}
+            <div className="relative hidden xs:flex items-center">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search script..."
+                className="w-28 sm:w-56 pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all min-h-[38px]"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Comments Panel Button */}
+            <button
+              onClick={() => setIsCommentsOpen(!isCommentsOpen)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer min-h-[40px] ${
+                isCommentsOpen
+                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+                  : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:text-white hover:bg-white/[0.08]'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Review</span>
+              {comments.length > 0 && (
+                <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
+                  {comments.length}
+                </span>
+              )}
+            </button>
+
+            {/* Copy Share Link */}
+            <button
+              onClick={() => handleCopyQuoteLink(currentTime)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer border border-white/[0.06] min-h-[40px]"
+              title="Copy share link at current timestamp"
+            >
+              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{copiedLink ? 'Link Copied' : 'Share'}</span>
+            </button>
+
+            {/* Download Button (if permitted) */}
+            {project.shareSettings?.allowDownloads !== false && (
+              <a
+                href={videoUrl}
+                download={`${project.title}.mp4`}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/30 min-h-[40px]"
+                title="Download rendered MP4 video"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download</span>
+              </a>
+            )}
+
+            {/* Duplicate to Edit button */}
+            {onOpenInEditor && (
+              <button
+                onClick={() => onOpenInEditor(project.id)}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer min-h-[40px]"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">Edit in Studio</span>
+                <span className="xs:hidden">Edit</span>
               </button>
             )}
           </div>
-
-          {/* Comments Panel Button */}
-          <button
-            onClick={() => setIsCommentsOpen(!isCommentsOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
-              isCommentsOpen
-                ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
-                : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:text-white hover:bg-white/[0.08]'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Review</span>
-            {comments.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
-                {comments.length}
-              </span>
-            )}
-          </button>
-
-          {/* Copy Share Link */}
-          <button
-            onClick={() => handleCopyQuoteLink(currentTime)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer border border-white/[0.06]"
-            title="Copy share link at current timestamp"
-          >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedLink ? 'Link Copied' : 'Share'}</span>
-          </button>
-
-          {/* Download Button (if permitted) */}
-          {project.shareSettings?.allowDownloads !== false && (
-            <a
-              href={videoUrl}
-              download={`${project.title}.mp4`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold transition-colors cursor-pointer border border-emerald-500/30"
-              title="Download rendered MP4 video"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download</span>
-            </a>
-          )}
-
-          {/* Duplicate to Edit button */}
-          {onOpenInEditor && (
-            <button
-              onClick={() => onOpenInEditor(project.id)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Duplicate & Edit</span>
-            </button>
-          )}
         </div>
       </header>
 
-      {/* Main Presentation Layout (Split: Video Player Left, Interactive Transcript Right, Optional Comments Drawer) */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Video Stage Area */}
-        <div className="flex-1 flex flex-col bg-black/60 items-center justify-center p-6 relative">
+      {/* Main Presentation Layout (Split: Video Player Left, Interactive Transcript Right) */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Video Stage Area */}
+        <div className="w-full lg:flex-1 flex flex-col bg-black/60 items-center justify-center p-3 sm:p-6 relative shrink-0 border-b lg:border-b-0 border-white/[0.08]">
           <div
-            className={`relative rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10 flex items-center justify-center transition-all ${
+            className={`relative rounded-xl lg:rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10 flex items-center justify-center transition-all ${
               project.aspectRatio === '9:16'
-                ? 'w-[320px] h-[568px]'
+                ? 'w-[200px] sm:w-[320px] aspect-[9/16] max-h-[30vh] lg:max-h-[568px]'
                 : project.aspectRatio === '1:1'
-                ? 'w-[480px] h-[480px]'
-                : 'w-full max-w-4xl aspect-video'
+                ? 'w-[260px] sm:w-[480px] aspect-square max-h-[30vh] lg:max-h-[480px]'
+                : 'w-full max-w-sm sm:max-w-2xl lg:max-w-4xl aspect-video max-h-[30vh] lg:max-h-none'
             }`}
           >
             <video
@@ -544,7 +547,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
         </div>
 
         {/* Right Area: Interactive Synchronized Transcript */}
-        <div className="w-[450px] border-l border-white/[0.08] bg-[#121622] flex flex-col overflow-hidden">
+        <div className="w-full lg:w-[450px] flex-1 lg:flex-none border-t lg:border-t-0 lg:border-l border-white/[0.08] bg-[#121622] flex flex-col overflow-hidden">
           {/* Transcript Sub-header */}
           <div className="h-12 px-5 border-b border-white/[0.06] flex items-center justify-between text-xs text-slate-400 bg-[#141824]">
             <div className="flex items-center gap-2">
@@ -623,7 +626,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
 
         {/* Collapsible Review & Comments Drawer */}
         {isCommentsOpen && (
-          <div className="w-[360px] border-l border-white/[0.08] bg-[#141824] flex flex-col overflow-hidden animate-slideLeft">
+          <div className="w-full sm:w-[360px] fixed sm:relative inset-y-0 right-0 z-40 sm:z-auto border-l border-white/[0.08] bg-[#141824] flex flex-col overflow-hidden animate-slideLeft pt-safe pb-safe sm:pt-0 sm:pb-0 shadow-2xl">
             {/* Comments Header */}
             <div className="h-12 px-4 border-b border-white/[0.06] flex items-center justify-between bg-[#121622]">
               <div className="flex items-center gap-2">

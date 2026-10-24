@@ -81,17 +81,17 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
   const trackCanvasWidthPct = `${Math.max(100, Math.round(zoom * 100))}%`;
 
   return (
-    <div className="h-64 border-t border-white/[0.08] bg-[#0c0f16] flex flex-col font-sans select-none shrink-0 z-10">
+    <div className="h-40 sm:h-64 border-t border-white/[0.08] bg-[#0c0f16] flex flex-col font-sans select-none shrink-0 z-10 pb-safe">
       {/* Timeline Controls Toolbar */}
-      <div className="h-10 px-4 border-b border-white/[0.06] bg-[#121622] flex items-center justify-between text-xs text-slate-300">
-        <div className="flex items-center gap-3">
+      <div className="h-12 sm:h-10 px-3 sm:px-4 border-b border-white/[0.06] bg-[#121622] flex items-center justify-between text-xs text-slate-300">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Play/Pause */}
           <button
             onClick={onTogglePlay}
-            className="p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
+            className="p-2 sm:p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl sm:rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all active:scale-95 cursor-pointer shadow-md shadow-indigo-600/30"
             title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           >
-            {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {isPlaying ? <Pause className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> : <Play className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
           </button>
 
           {/* Time Display */}
@@ -100,36 +100,37 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
             <span className="text-slate-500"> / {formatTime(duration)}</span>
           </div>
 
-          <div className="h-4 w-[1px] bg-white/10" />
+          <div className="h-4 w-[1px] bg-white/10 hidden sm:block" />
 
           {/* Split at playhead */}
           <div className="flex items-center gap-1">
             <button
               onClick={onSplitAtPlayhead}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer min-h-[40px]"
               title="Split clip at playhead position (S)"
             >
               <Scissors className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Split Clip (S)</span>
+              <span className="hidden sm:inline">Split Clip (S)</span>
+              <span className="sm:hidden">Split</span>
             </button>
           </div>
         </div>
 
         {/* Right side zoom */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <button
             onClick={() => setZoom(Math.max(0.8, Number((zoom - 0.25).toFixed(2))))}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
+            className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Zoom Out"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
-          <span className="font-mono text-[11px] text-slate-400 w-11 text-center">
+          <span className="font-mono text-[11px] text-slate-400 w-9 sm:w-11 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
             onClick={() => setZoom(Math.min(3.0, Number((zoom + 0.25).toFixed(2))))}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
+            className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
             title="Zoom In"
           >
             <ZoomIn className="w-3.5 h-3.5" />
@@ -140,7 +141,7 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
       {/* Main Track Grid */}
       <div className="flex-1 flex overflow-hidden">
         {/* Track Headers (Left column) */}
-        <div className="w-56 border-r border-white/[0.08] bg-[#121622]/95 flex flex-col shrink-0 overflow-y-auto">
+        <div className="w-32 sm:w-56 border-r border-white/[0.08] bg-[#121622]/95 flex flex-col shrink-0 overflow-y-auto">
           {tracks.map((track) => {
             const Icon = getTrackIcon(track.type);
             return (

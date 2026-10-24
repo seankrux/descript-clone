@@ -71,9 +71,9 @@ export const EmbedViewway: React.FC<EmbedViewwayProps> = ({
   };
 
   return (
-    <div className="flex h-screen w-screen bg-[#0d1017] text-white font-sans overflow-hidden select-none">
+    <div className="flex flex-col sm:flex-row h-screen w-screen bg-[#0d1017] text-white font-sans overflow-hidden select-none">
       {/* Video Viewport */}
-      <div className="flex-1 flex flex-col relative bg-black justify-center items-center">
+      <div className="flex-1 flex flex-col relative bg-black justify-center items-center overflow-hidden">
         {/* Top Header Overlay */}
         <div className="absolute top-0 inset-x-0 h-10 px-4 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export const EmbedViewway: React.FC<EmbedViewwayProps> = ({
 
       {/* Synchronized Script Drawer */}
       {showTranscript && (
-        <div className="w-64 border-l border-white/10 bg-[#121622] flex flex-col overflow-hidden">
+        <div className="w-full sm:w-64 h-48 sm:h-auto border-t sm:border-t-0 sm:border-l border-white/10 bg-[#121622] flex flex-col overflow-hidden shrink-0">
           <div className="h-10 px-3 border-b border-white/10 flex items-center justify-between text-[11px] text-slate-400 font-semibold">
             <span>Synchronized Script</span>
             <span>{activeWords.length} words</span>

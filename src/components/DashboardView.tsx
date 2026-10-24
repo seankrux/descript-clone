@@ -58,6 +58,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<'projects' | 'shared' | 'extension' | 'profile'>('projects');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState<'video' | 'audio'>('video');
@@ -96,8 +98,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onChange={handleFileInputChange}
       />
 
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-white/[0.08] bg-[#121622] flex flex-col justify-between shrink-0">
+      {/* Sidebar (Desktop only) */}
+      <aside className="hidden md:flex w-64 border-r border-white/[0.08] bg-[#121622] flex-col justify-between shrink-0">
         <div>
           {/* Workspace Switcher */}
           <div className="p-4 border-b border-white/[0.08]">
@@ -201,55 +203,66 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Header */}
-        <header className="h-16 px-8 border-b border-white/[0.08] flex items-center justify-between bg-[#10141f]">
-          <div className="flex items-center gap-4 flex-1 max-w-md">
-            <div className="relative w-full">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search projects, transcripts, audio..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-black/30 border border-white/[0.08] rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-              />
+        {/* Top Header with iOS Safe Area support */}
+        <header className="pt-safe border-b border-white/[0.08] bg-[#10141f] shrink-0 z-20">
+          <div className="h-16 px-4 sm:px-8 flex items-center justify-between gap-3">
+            {/* Mobile Brand / Avatar */}
+            <div className="flex md:hidden items-center gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs text-white shadow-md shadow-indigo-500/30">
+                D
+              </div>
+              <span className="font-bold text-xs tracking-tight text-white hidden xs:inline">Descriptivist</span>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Direct Screen & Cam Recorder */}
-            <button
-              onClick={() => setIsRecorderOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-medium text-xs flex items-center gap-2 transition-all cursor-pointer border border-white/10"
-              title="Record screen or webcam directly"
-            >
-              <Camera className="w-4 h-4 text-rose-400" />
-              <span>Record</span>
-            </button>
+            <div className="flex items-center gap-4 flex-1 max-w-md">
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search projects, audio..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-black/30 border border-white/[0.08] rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
 
-            {/* Direct Import Media */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-medium text-xs flex items-center gap-2 transition-all cursor-pointer border border-white/10"
-              title="Upload video or audio to auto-transcribe"
-            >
-              <Upload className="w-4 h-4 text-emerald-400" />
-              <span>Import Media</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Direct Screen & Cam Recorder (Desktop/Tablet) */}
+              <button
+                onClick={() => setIsRecorderOpen(true)}
+                className="hidden sm:flex px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-medium text-xs items-center gap-2 transition-all cursor-pointer border border-white/10 min-h-[44px]"
+                title="Record screen or webcam directly"
+              >
+                <Camera className="w-4 h-4 text-rose-400" />
+                <span>Record</span>
+              </button>
 
-            {/* New Project */}
-            <button
-              onClick={() => setIsNewProjectModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Project</span>
-            </button>
+              {/* Direct Import Media */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="hidden sm:flex px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-medium text-xs items-center gap-2 transition-all cursor-pointer border border-white/10 min-h-[44px]"
+                title="Upload video or audio to auto-transcribe"
+              >
+                <Upload className="w-4 h-4 text-emerald-400" />
+                <span>Import</span>
+              </button>
+
+              {/* New Project */}
+              <button
+                onClick={() => setIsNewProjectModalOpen(true)}
+                className="px-3.5 sm:px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer min-h-[44px]"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Project</span>
+                <span className="sm:hidden">New</span>
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-8">
+        {/* Content Body with iOS inertia scrolling & bottom tab bar clearance */}
+        <div className="flex-1 overflow-y-auto ios-scroll p-4 sm:p-8 pb-[calc(env(safe-area-inset-bottom)+88px)]">
           {/* Subheader Filters */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -339,7 +352,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       Open in Editor →
                     </span>
 
-                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -348,13 +361,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           setCopiedId(project.id);
                           setTimeout(() => setCopiedId(null), 2000);
                         }}
-                        className="p-1.5 hover:text-white rounded-lg bg-white/[0.04] hover:bg-white/10 transition-colors cursor-pointer"
+                        className="p-2 sm:p-1.5 hover:text-white rounded-xl bg-white/[0.04] hover:bg-white/10 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Copy Public Presentation Link"
                       >
                         {copiedId === project.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-400" />
                         ) : (
-                          <Share2 className="w-3.5 h-3.5" />
+                          <Share2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                         )}
                       </button>
 
@@ -367,10 +380,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             window.open(`/?share=${project.id}`, '_blank');
                           }
                         }}
-                        className="p-1.5 hover:text-white rounded-lg bg-white/[0.04] hover:bg-white/10 transition-colors cursor-pointer"
+                        className="p-2 sm:p-1.5 hover:text-white rounded-xl bg-white/[0.04] hover:bg-white/10 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Open Public Viewway in Window"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <ExternalLink className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                       </button>
 
                       <button
@@ -378,10 +391,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           e.stopPropagation();
                           onDeleteProject(project.id);
                         }}
-                        className="p-1.5 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                        className="p-2 sm:p-1.5 hover:text-red-400 rounded-xl hover:bg-red-500/10 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Delete Project"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -543,7 +556,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="pt-4 mt-4 border-t border-white/[0.08] flex items-center justify-end">
               <button
                 onClick={() => setIsExtensionModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs cursor-pointer shadow"
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs cursor-pointer shadow min-h-[44px]"
               >
                 Got it
               </button>
@@ -551,6 +564,146 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Mobile Profile & Workspace Sheet */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="w-full sm:max-w-md bg-[#141824] border border-white/[0.1] rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-safe">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-indigo-400/40 flex items-center justify-center font-bold text-sm text-white shadow-md">
+                  SG
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Sean G</h3>
+                  <p className="text-[11px] text-slate-400">seanguillermo@gmail.com</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsProfileModalOpen(false)}
+                className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                  <span className="flex items-center gap-1.5">
+                    <HardDrive className="w-4 h-4 text-indigo-400" />
+                    Cloud Drive
+                  </span>
+                  <span>2.4 / 10 GB</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full bg-indigo-500 rounded-full w-[24%]" />
+                </div>
+              </div>
+
+              {onResetToDemo && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Reset all projects back to factory sample demo state?')) {
+                      onResetToDemo();
+                      setIsProfileModalOpen(false);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-amber-300 bg-amber-950/20 border border-amber-500/30 text-xs font-medium min-h-[44px] cursor-pointer"
+                >
+                  <Radio className="w-4 h-4 text-amber-400" />
+                  <span>Reset Demo Data</span>
+                </button>
+              )}
+
+              <button
+                onClick={onLogout}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-rose-300 bg-rose-950/20 border border-rose-500/30 text-xs font-semibold min-h-[44px] cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Log Out of Studio</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Native Bottom Navigation Tab Bar (Mobile Only) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 ios-glass border-t border-white/[0.08] pb-safe">
+        <div className="flex items-center justify-around h-16 px-2">
+          {/* Projects Tab */}
+          <button
+            onClick={() => {
+              setActiveMobileTab('projects');
+              setFilterType('all');
+            }}
+            className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 transition-transform active:scale-90 ${
+              activeMobileTab === 'projects' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Clock className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-semibold">Projects</span>
+          </button>
+
+          {/* Quick Record Tab */}
+          <button
+            onClick={() => setIsRecorderOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 text-rose-400 transition-transform active:scale-90"
+          >
+            <div className="w-9 h-9 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shadow-lg shadow-rose-500/20 -mt-2">
+              <Camera className="w-5 h-5 text-rose-400" />
+            </div>
+            <span className="text-[10px] font-semibold mt-0.5">Record</span>
+          </button>
+
+          {/* Shared Tab */}
+          <button
+            onClick={() => {
+              setActiveMobileTab('shared');
+              const sharedOnly = projects.filter((p) => p.shareSettings?.isPublished);
+              if (sharedOnly.length > 0) {
+                setSearchQuery('');
+              }
+            }}
+            className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 transition-transform active:scale-90 ${
+              activeMobileTab === 'shared' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Users className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-semibold">Shared</span>
+          </button>
+
+          {/* Extension Tab */}
+          <button
+            onClick={() => {
+              setActiveMobileTab('extension');
+              setIsExtensionModalOpen(true);
+            }}
+            className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 transition-transform active:scale-90 ${
+              activeMobileTab === 'extension' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Puzzle className="w-5 h-5 mb-1" />
+            <span className="text-[10px] font-semibold">Extension</span>
+          </button>
+
+          {/* Account / Profile Tab */}
+          <button
+            onClick={() => {
+              setActiveMobileTab('profile');
+              setIsProfileModalOpen(true);
+            }}
+            className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 transition-transform active:scale-90 ${
+              activeMobileTab === 'profile' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[8px] font-bold text-white mb-1">
+              SG
+            </div>
+            <span className="text-[10px] font-semibold">Profile</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };

@@ -66,7 +66,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
   );
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[380px] bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-y-0 right-0 w-full sm:w-[380px] max-w-full bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe">
       {/* Header */}
       <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
         <div className="flex items-center gap-2.5">

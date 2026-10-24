@@ -148,39 +148,39 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-xl bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-xl bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
+        <div className="p-4 sm:p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 shrink-0">
               <Download className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">Enterprise Export & Publish Studio</h3>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                <h3 className="font-bold text-sm text-white">Enterprise Export & Publish</h3>
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hidden xs:inline">
                   Pro Studio
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Lossless 4K, ProRes, broadcast audio, timeline interchange, and direct publishing
+                Lossless 4K, ProRes, broadcast audio, and timelines
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Header */}
-        <div className="flex border-b border-white/[0.08] bg-[#0e1118]/60 p-1 text-xs">
+        <div className="flex border-b border-white/[0.08] bg-[#0e1118]/60 p-1 text-xs shrink-0 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('export')}
-            className={`flex-1 py-2 text-center rounded-lg font-medium transition-colors ${
+            className={`flex-1 py-2 px-2 text-center rounded-lg font-medium transition-colors shrink-0 ${
               activeTab === 'export' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -188,24 +188,24 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('timeline')}
-            className={`flex-1 py-2 text-center rounded-lg font-medium transition-colors ${
+            className={`flex-1 py-2 px-2 text-center rounded-lg font-medium transition-colors shrink-0 ${
               activeTab === 'timeline' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            NLE Timelines & Subtitles
+            NLE Timelines
           </button>
           <button
             onClick={() => setActiveTab('publish')}
-            className={`flex-1 py-2 text-center rounded-lg font-medium transition-colors ${
+            className={`flex-1 py-2 px-2 text-center rounded-lg font-medium transition-colors shrink-0 ${
               activeTab === 'publish' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Cloud Share & Platforms
+            Cloud Platforms
           </button>
         </div>
 
         {/* Tab Body */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 ios-scroll">
           {activeTab === 'export' ? (
             <div className="space-y-5">
               {/* Format & Resolution selectors */}
