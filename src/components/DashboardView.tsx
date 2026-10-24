@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Plus, 
   Search, 
@@ -15,9 +15,16 @@ import {
   LayoutGrid,
   ListFilter,
   LogOut,
-  HardDrive
+  HardDrive,
+  Upload,
+  Radio,
+  Puzzle,
+  ExternalLink,
+  CheckCircle2,
+  Camera
 } from 'lucide-react';
 import { Project } from '../types';
+import { ScreenRecorderModal } from './ScreenRecorderModal';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -25,6 +32,8 @@ interface DashboardViewProps {
   onCreateProject: (type: 'video' | 'audio', title: string) => void;
   onDeleteProject: (projectId: string) => void;
   onLogout: () => void;
+  onImportMedia?: (file: File) => void;
+  onSaveRecording?: (videoUrl: string, title: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -33,12 +42,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onCreateProject,
   onDeleteProject,
   onLogout,
+  onImportMedia,
+  onSaveRecording,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [isRecorderOpen, setIsRecorderOpen] = useState(false);
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState<'video' | 'audio'>('video');
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const filteredProjects = projects.filter((p) => {
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -54,8 +69,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setIsNewProjectModalOpen(false);
   };
 
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onImportMedia) {
+      onImportMedia(file);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-[#0e1118] text-slate-100 font-sans overflow-hidden">
+      {/* Hidden file input for media import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*,audio/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       {/* Sidebar */}
       <aside className="w-64 border-r border-white/[0.08] bg-[#121622] flex flex-col justify-between shrink-0">
         <div>
@@ -68,7 +99,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="text-left">
                   <div className="text-xs font-semibold text-white leading-tight">Alex's Drive</div>
-                  <div className="text-[10px] text-slate-400">Creator Plan</div>
+                  <div className="text-[10px] text-slate-400">Enterprise Studio Plan</div>
                 </div>
               </div>
               <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -88,6 +119,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors">
               <Users className="w-4 h-4 text-slate-400" />
               <span>Shared with me</span>
+            </button>
+            <button
+              onClick={() => setIsExtensionModalOpen(true)}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-indigo-300 bg-indigo-950/30 hover:bg-indigo-950/60 border border-indigo-500/20 transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                <Puzzle className="w-4 h-4 text-indigo-400" />
+                <span>Chrome Extension</span>
+              </div>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                MV3
+              </span>
             </button>
             <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors">
               <Trash2 className="w-4 h-4 text-slate-400" />
@@ -118,6 +161,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <span className="text-xs font-medium text-slate-300">alex@creator.io</span>
             </div>
+
             <button 
               onClick={onLogout}
               title="Logout"
@@ -146,7 +190,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Direct Screen & Cam Recorder */}
+            <button
+              onClick={() => setIsRecorderOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-medium text-xs flex items-center gap-2 transition-all cursor-pointer border border-white/10"
+              title="Record screen or webcam directly"
+            >
+              <Camera className="w-4 h-4 text-rose-400" />
+              <span>Record</span>
+            </button>
+
+            {/* Direct Import Media */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 font-medium text-xs flex items-center gap-2 transition-all cursor-pointer border border-white/10"
+              title="Upload video or audio to auto-transcribe"
+            >
+              <Upload className="w-4 h-4 text-emerald-400" />
+              <span>Import Media</span>
+            </button>
+
+            {/* New Project */}
             <button
               onClick={() => setIsNewProjectModalOpen(true)}
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
@@ -169,7 +234,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center gap-2 bg-white/[0.04] p-1 rounded-xl border border-white/[0.08] text-xs">
               <button
                 onClick={() => setFilterType('all')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   filterType === 'all' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -177,7 +242,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
               <button
                 onClick={() => setFilterType('video')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   filterType === 'video' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -185,7 +250,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
               <button
                 onClick={() => setFilterType('audio')}
-                className={`px-3 py-1.5 rounded-lg transition-colors ${
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   filterType === 'audio' ? 'bg-indigo-600 text-white font-medium' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -246,7 +311,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         e.stopPropagation();
                         onDeleteProject(project.id);
                       }}
-                      className="p-1 hover:text-red-400 rounded transition-colors"
+                      className="p-1 hover:text-red-400 rounded transition-colors cursor-pointer"
                       title="Delete Project"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -268,7 +333,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* New Project Modal */}
       {isNewProjectModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl">
+          <div className="w-full max-w-md bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
             <h2 className="text-lg font-bold text-white mb-1">Create New Project</h2>
             <p className="text-xs text-slate-400 mb-5">Start with a blank canvas or import media.</p>
 
@@ -335,6 +400,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Screen Recorder Modal */}
+      {isRecorderOpen && (
+        <ScreenRecorderModal
+          isOpen={isRecorderOpen}
+          onClose={() => setIsRecorderOpen(false)}
+          onSaveRecording={(url, title) => {
+            setIsRecorderOpen(false);
+            if (onSaveRecording) {
+              onSaveRecording(url, title);
+            }
+          }}
+        />
+      )}
+
+      {/* Chrome Extension Companion Info Modal */}
+      {isExtensionModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white">
+                  <Puzzle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">Descript Companion Extension</h3>
+                  <span className="text-[10px] text-indigo-300 font-mono">Manifest V3 Chrome Extension</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsExtensionModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-300">
+              <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/30 space-y-1">
+                <span className="font-semibold text-white block">How to Load Unpacked in Chrome:</span>
+                <ol className="list-decimal list-inside space-y-1 text-slate-300 pl-1 text-[11px]">
+                  <li>Open Google Chrome and navigate to <span className="font-mono text-indigo-300">chrome://extensions</span></li>
+                  <li>Toggle on <strong>Developer mode</strong> in the top-right corner.</li>
+                  <li>Click <strong>Load unpacked</strong> and select the directory:</li>
+                  <li className="font-mono text-indigo-300 bg-black/40 px-2 py-1 rounded break-all">
+                    /Users/sean5/.gemini/antigravity/scratch/descript-clone/extension
+                  </li>
+                </ol>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                <span className="font-semibold text-white block">Extension Features:</span>
+                <ul className="space-y-1 text-slate-400 text-[11px]">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Records any browser tab, desktop window, or full screen.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Injects draggable circular webcam bubble onto the page.</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Instant sync back into Descript Web Studio via BroadcastChannel & URL auto-import.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="pt-4 mt-4 border-t border-white/[0.08] flex items-center justify-end">
+              <button
+                onClick={() => setIsExtensionModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs cursor-pointer shadow"
+              >
+                Got it
+              </button>
+            </div>
           </div>
         </div>
       )}

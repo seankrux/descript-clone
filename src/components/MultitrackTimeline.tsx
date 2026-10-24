@@ -18,7 +18,7 @@ import {
   Music,
   Plus
 } from 'lucide-react';
-import { TimelineTrack, WordToken } from '../types';
+import { TimelineTrack, WordToken, TimelineClip } from '../types';
 
 interface MultitrackTimelineProps {
   tracks: TimelineTrack[];
@@ -43,7 +43,7 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
   onUpdateTrack,
   words,
 }) => {
-  const [zoom, setZoom] = useState(1.0); // 0.5 to 2.0
+  const [zoom, setZoom] = useState(1.0); // 1.0 to 3.0
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const getTrackIcon = (type: string) => {
@@ -65,8 +65,9 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickRatio = Math.max(0, Math.min(1, clickX / rect.width));
+    const clickX = e.clientX - rect.left + (containerRef.current?.scrollLeft || 0);
+    const totalWidth = e.currentTarget.scrollWidth;
+    const clickRatio = Math.max(0, Math.min(1, clickX / totalWidth));
     onSeek(clickRatio * duration);
   };
 
@@ -77,8 +78,10 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms}`;
   };
 
+  const trackCanvasWidthPct = `${Math.max(100, Math.round(zoom * 100))}%`;
+
   return (
-    <div className="h-60 border-t border-white/[0.08] bg-[#0c0f16] flex flex-col font-sans select-none shrink-0 z-10">
+    <div className="h-64 border-t border-white/[0.08] bg-[#0c0f16] flex flex-col font-sans select-none shrink-0 z-10">
       {/* Timeline Controls Toolbar */}
       <div className="h-10 px-4 border-b border-white/[0.06] bg-[#121622] flex items-center justify-between text-xs text-slate-300">
         <div className="flex items-center gap-3">
@@ -86,6 +89,7 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
           <button
             onClick={onTogglePlay}
             className="p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
+            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           >
             {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           </button>
@@ -98,15 +102,15 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
 
           <div className="h-4 w-[1px] bg-white/10" />
 
-          {/* Tools */}
+          {/* Split at playhead */}
           <div className="flex items-center gap-1">
             <button
               onClick={onSplitAtPlayhead}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
-              title="Split clip at playhead (S)"
+              title="Split clip at playhead position (S)"
             >
               <Scissors className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Split (S)</span>
+              <span>Split Clip (S)</span>
             </button>
           </div>
         </div>
@@ -114,17 +118,19 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
         {/* Right side zoom */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.06]"
+            onClick={() => setZoom(Math.max(0.8, Number((zoom - 0.25).toFixed(2))))}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
+            title="Zoom Out"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
-          <span className="font-mono text-[11px] text-slate-400 w-9 text-center">
+          <span className="font-mono text-[11px] text-slate-400 w-11 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
-            onClick={() => setZoom(Math.min(2.5, zoom + 0.25))}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.06]"
+            onClick={() => setZoom(Math.min(3.0, Number((zoom + 0.25).toFixed(2))))}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
+            title="Zoom In"
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
@@ -134,7 +140,7 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
       {/* Main Track Grid */}
       <div className="flex-1 flex overflow-hidden">
         {/* Track Headers (Left column) */}
-        <div className="w-56 border-r border-white/[0.08] bg-[#121622]/90 flex flex-col shrink-0 overflow-y-auto">
+        <div className="w-56 border-r border-white/[0.08] bg-[#121622]/95 flex flex-col shrink-0 overflow-y-auto">
           {tracks.map((track) => {
             const Icon = getTrackIcon(track.type);
             return (
@@ -152,17 +158,19 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
                 <div className="flex items-center gap-1 text-slate-500">
                   <button
                     onClick={() => onUpdateTrack({ ...track, isMuted: !track.isMuted })}
-                    className={`p-1 rounded hover:text-white transition-colors ${
+                    className={`p-1 rounded hover:text-white transition-colors cursor-pointer ${
                       track.isMuted ? 'text-amber-400' : ''
                     }`}
+                    title={track.isMuted ? 'Unmute' : 'Mute'}
                   >
                     {track.isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                   </button>
                   <button
                     onClick={() => onUpdateTrack({ ...track, isLocked: !track.isLocked })}
-                    className={`p-1 rounded hover:text-white transition-colors ${
+                    className={`p-1 rounded hover:text-white transition-colors cursor-pointer ${
                       track.isLocked ? 'text-red-400' : ''
                     }`}
+                    title={track.isLocked ? 'Unlock track' : 'Lock track'}
                   >
                     {track.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                   </button>
@@ -178,55 +186,93 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
           onClick={handleTimelineClick}
           className="flex-1 relative overflow-x-auto overflow-y-hidden cursor-crosshair bg-[#0a0d14]"
         >
-          {/* Timecode Ruler on top */}
-          <div className="h-5 border-b border-white/[0.06] bg-black/40 flex items-center text-[10px] font-mono text-slate-500 relative">
-            {Array.from({ length: Math.ceil(duration / 2) + 1 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute top-0 bottom-0 border-l border-white/[0.08] pl-1 pt-0.5"
-                style={{ left: `${((i * 2) / duration) * 100}%` }}
-              >
-                {i * 2}s
-              </div>
-            ))}
-          </div>
+          <div
+            className="relative h-full flex flex-col"
+            style={{ width: trackCanvasWidthPct, minWidth: '100%' }}
+          >
+            {/* Timecode Ruler on top */}
+            <div className="h-6 border-b border-white/[0.06] bg-black/40 flex items-center text-[10px] font-mono text-slate-500 relative">
+              {Array.from({ length: Math.ceil(duration / 2) + 1 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute top-0 bottom-0 border-l border-white/[0.08] pl-1 pt-0.5"
+                  style={{ left: `${((i * 2) / duration) * 100}%` }}
+                >
+                  {i * 2}s
+                </div>
+              ))}
+            </div>
 
-          {/* Track Rows */}
-          <div className="flex flex-col relative">
-            {tracks.map((track) => (
-              <div
-                key={track.id}
-                className="h-10 border-b border-white/[0.04] relative flex items-center px-1"
-              >
-                {track.clips.map((clip) => {
-                  const leftPct = (clip.startTime / duration) * 100;
-                  const widthPct = (clip.duration / duration) * 100;
-                  return (
-                    <div
-                      key={clip.id}
-                      className="absolute top-1 bottom-1 rounded-md border border-white/20 px-2 flex items-center justify-between text-[11px] font-medium text-white shadow-sm overflow-hidden"
-                      style={{
-                        left: `${leftPct}%`,
-                        width: `${Math.max(2, widthPct)}%`,
-                        backgroundColor: `${clip.color}90`,
-                      }}
-                    >
-                      <span className="truncate">{clip.title}</span>
-                      <span className="text-[9px] opacity-75 font-mono ml-1 shrink-0">
-                        {clip.duration.toFixed(1)}s
-                      </span>
+            {/* Track Rows */}
+            <div className="flex-1 flex flex-col relative">
+              {tracks.map((track) => (
+                <div
+                  key={track.id}
+                  className="h-10 border-b border-white/[0.04] relative flex items-center px-1"
+                >
+                  {/* If Script track, render word boundaries along the timeline */}
+                  {track.type === 'script' ? (
+                    <div className="absolute inset-0 flex items-center px-1 overflow-hidden pointer-events-none">
+                      {words
+                        .filter((w) => !w.deleted)
+                        .map((w) => {
+                          const wLeft = (w.start / duration) * 100;
+                          const wWidth = ((w.end - w.start) / duration) * 100;
+                          const isCur = currentTime >= w.start && currentTime <= w.end;
+                          return (
+                            <div
+                              key={w.id}
+                              className={`absolute top-1.5 bottom-1.5 rounded px-1 flex items-center text-[9px] font-mono truncate border ${
+                                isCur
+                                  ? 'bg-indigo-600 text-white border-indigo-400 font-bold z-10'
+                                  : w.isFiller
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  : w.isOverdub
+                                  ? 'bg-purple-500/30 text-purple-300 border-purple-500/40'
+                                  : 'bg-indigo-950/40 text-indigo-300/80 border-indigo-500/20'
+                              }`}
+                              style={{
+                                left: `${wLeft}%`,
+                                width: `${Math.max(1, wWidth)}%`,
+                              }}
+                            >
+                              <span className="truncate">{w.text}</span>
+                            </div>
+                          );
+                        })}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                  ) : (
+                    track.clips.map((clip) => {
+                      const leftPct = (clip.startTime / duration) * 100;
+                      const widthPct = (clip.duration / duration) * 100;
+                      return (
+                        <div
+                          key={clip.id}
+                          className="absolute top-1 bottom-1 rounded-md border border-white/20 px-2 flex items-center justify-between text-[11px] font-medium text-white shadow-sm overflow-hidden"
+                          style={{
+                            left: `${leftPct}%`,
+                            width: `${Math.max(2, widthPct)}%`,
+                            backgroundColor: `${clip.color}90`,
+                          }}
+                        >
+                          <span className="truncate">{clip.title}</span>
+                          <span className="text-[9px] opacity-75 font-mono ml-1 shrink-0">
+                            {clip.duration.toFixed(1)}s
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              ))}
 
-            {/* Playhead Scrub Line */}
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none transition-all duration-75"
-              style={{ left: `${(currentTime / duration) * 100}%` }}
-            >
-              <div className="w-3 h-3 bg-red-500 rotate-45 -translate-x-[5px] -translate-y-1.5 shadow" />
+              {/* Playhead Scrub Line */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none transition-all duration-75"
+                style={{ left: `${(currentTime / duration) * 100}%` }}
+              >
+                <div className="w-3 h-3 bg-red-500 rotate-45 -translate-x-[5px] -translate-y-1.5 shadow" />
+              </div>
             </div>
           </div>
         </div>

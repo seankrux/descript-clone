@@ -11,7 +11,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
     }
     body {
-      width: 340px;
+      width: 350px;
       background-color: #0e1118;
       color: #f1f5f9;
       padding: 16px;
@@ -50,7 +50,7 @@
     .brand-pill {
       font-size: 9px;
       font-family: monospace;
-      padding: 2px 5px;
+      padding: 2px 6px;
       border-radius: 4px;
       background: rgba(99, 102, 241, 0.2);
       color: #a5b4fc;
@@ -104,7 +104,7 @@
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 12px;
       padding: 6px 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .toggle-row {
       display: flex;
@@ -156,6 +156,24 @@
     }
     input:checked + .slider:before {
       transform: translateX(14px);
+    }
+    .studio-config-box {
+      margin-bottom: 14px;
+    }
+    .studio-input {
+      width: 100%;
+      padding: 7px 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #94a3b8;
+      font-size: 10px;
+      font-family: monospace;
+      outline: none;
+    }
+    .studio-input:focus {
+      border-color: #6366f1;
+      color: #ffffff;
     }
     .record-btn {
       width: 100%;
@@ -215,7 +233,7 @@
         <div class="brand-title">Descript Companion</div>
       </div>
     </div>
-    <span class="brand-pill">V3 Sync</span>
+    <span class="brand-pill">V3 Sync Active</span>
   </div>
 
   <div class="section-title">Recording Surface</div>
@@ -263,13 +281,18 @@
     </div>
   </div>
 
+  <div class="studio-config-box">
+    <div class="section-title">Descript Web Studio URL</div>
+    <input type="text" id="studio-url-input" class="studio-input" placeholder="http://localhost:5173" value="http://localhost:5173">
+  </div>
+
   <button class="record-btn" id="start-record-btn">
     <div class="rec-dot"></div>
     <span>Start Recording</span>
   </button>
 
   <div class="footer-link">
-    <a href="http://localhost:5173" target="_blank">Open Descript Web Studio ↗</a>
+    <a id="open-studio-link" href="http://localhost:5173" target="_blank">Open Descript Web Studio ↗</a>
   </div>
 
   <script src="popup.js"></script>

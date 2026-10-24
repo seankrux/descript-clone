@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Play, 
   Pause, 
@@ -57,11 +57,21 @@ import { ScreenRecorderModal } from './ScreenRecorderModal';
 import { CommentsPanel } from './CommentsPanel';
 import { EnterpriseExportModal } from './EnterpriseExportModal';
 import { CanvasTransitionsModal } from './CanvasTransitionsModal';
+import { ToastContainer, ToastMessage } from './Toast';
+import { StudioAudioEngine } from '../utils/audioDsp';
 
 interface EditorViewProps {
   project: Project;
   onBack: () => void;
   onUpdateProject: (updated: Project) => void;
+}
+
+interface SpeakerTurn {
+  speaker: string;
+  avatar: string;
+  cameraLabel: string;
+  startTime: number;
+  words: WordToken[];
 }
 
 export const EditorView: React.FC<EditorViewProps> = ({
@@ -77,6 +87,20 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
+
+  // In-App Toast system
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const addToast = (type: 'success' | 'error' | 'info', message: string, description?: string) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, type, message, description }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   // Modals & Panels state
   const [isUnderlordOpen, setIsUnderlordOpen] = useState(false);
@@ -151,24 +175,74 @@ export const EditorView: React.FC<EditorViewProps> = ({
   );
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
 
-  // Video Ref
+  // Video Ref & Audio DSP Engine
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioEngineRef = useRef<StudioAudioEngine | null>(null);
 
-  // Sync video time
+  // Initialize Web Audio Engine
+  useEffect(() => {
+    if (!audioEngineRef.current) {
+      audioEngineRef.current = new StudioAudioEngine();
+    }
+    const engine = audioEngineRef.current;
+    if (videoRef.current) {
+      engine.init(videoRef.current);
+      engine.updateConfig(studioSound);
+    }
+    return () => {
+      // Keep engine across re-renders
+    };
+  }, []);
+
+  // Update DSP whenever Studio Sound config changes
+  useEffect(() => {
+    if (audioEngineRef.current) {
+      audioEngineRef.current.updateConfig(studioSound);
+    }
+  }, [studioSound]);
+
+  // Sync video time & DESCRIPT CORE EDITING SKIP LOGIC
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
+      const cur = video.currentTime;
+      setCurrentTime(cur);
+
+      // --- CRITICAL DESCRIPT FEATURE: Skip Deleted Words during Playback ---
+      if (isPlaying) {
+        const deletedWordAtCur = words.find(
+          (w) => w.deleted && cur >= w.start && cur < w.end
+        );
+
+        if (deletedWordAtCur) {
+          // Find next non-deleted word's start time
+          const nextActiveWord = words.find(
+            (w) => !w.deleted && w.start >= deletedWordAtCur.end
+          );
+
+          if (nextActiveWord) {
+            video.currentTime = nextActiveWord.start;
+            setCurrentTime(nextActiveWord.start);
+            return;
+          } else {
+            video.currentTime = deletedWordAtCur.end;
+            setCurrentTime(deletedWordAtCur.end);
+            return;
+          }
+        }
+      }
 
       // Auto-speaker multicam angle cut if enabled
       if (isAutoSpeakerCut && multicamAngles.length > 1) {
         const currentActiveToken = words.find(
-          (w) => !w.deleted && video.currentTime >= w.start && video.currentTime <= w.end
+          (w) => !w.deleted && cur >= w.start && cur <= w.end
         );
         if (currentActiveToken) {
-          const matchingAngle = multicamAngles.find((a) => a.speaker.toLowerCase() === currentActiveToken.speaker.toLowerCase());
+          const matchingAngle = multicamAngles.find(
+            (a) => a.speaker.toLowerCase() === currentActiveToken.speaker.toLowerCase()
+          );
           if (matchingAngle && matchingAngle.id !== activeAngleId) {
             setActiveAngleId(matchingAngle.id);
           }
@@ -187,9 +261,9 @@ export const EditorView: React.FC<EditorViewProps> = ({
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [isAutoSpeakerCut, multicamAngles, activeAngleId, words]);
+  }, [isPlaying, words, isAutoSpeakerCut, multicamAngles, activeAngleId]);
 
-  // Keyboard shortcut listener (Space, Backspace, Cmd+K)
+  // Keyboard shortcut listener (Space, Backspace, Cmd+K, S)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -212,11 +286,15 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedWordId, isPlaying, currentTime]);
+  }, [selectedWordId, isPlaying, currentTime, tracks]);
 
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
+
+    if (audioEngineRef.current) {
+      audioEngineRef.current.resumeContext();
+    }
 
     if (isPlaying) {
       video.pause();
@@ -244,34 +322,76 @@ export const EditorView: React.FC<EditorViewProps> = ({
       prev.map((w) => (w.id === wordId ? { ...w, deleted: true } : w))
     );
     setSelectedWordId(null);
+    addToast('info', 'Word Cut from Video', 'Playback will now seamlessly skip this audio segment.');
   };
 
   const restoreWord = (wordId: string) => {
     setWords((prev) =>
       prev.map((w) => (w.id === wordId ? { ...w, deleted: false } : w))
     );
+    addToast('success', 'Word Restored', 'Segment added back to the video timeline.');
   };
 
   // Underlord AI Actions
   const removeAllFillerWords = () => {
+    const fillerCount = words.filter((w) => w.isFiller && !w.deleted).length;
     setWords((prev) =>
       prev.map((w) => (w.isFiller ? { ...w, deleted: true } : w))
     );
     confetti({
-      particleCount: 50,
+      particleCount: 60,
       spread: 60,
       origin: { y: 0.6 },
     });
+    addToast(
+      'success',
+      `Removed ${fillerCount} Filler Words!`,
+      'Underlord seamlessly cut all "um", "uh", and "you know" speech tokens from your media.'
+    );
   };
 
   const shortenSilences = () => {
-    // Shorten wordless gaps
-    confetti({ particleCount: 40, spread: 50 });
-    alert('Underlord removed 4.2 seconds of dead air across the timeline!');
+    // Real silence shortening: detect gaps between consecutive words > 0.4s and compress to 0.15s
+    let savedTime = 0;
+    const sortedWords = [...words];
+    let cumulativeShift = 0;
+
+    for (let i = 0; i < sortedWords.length - 1; i++) {
+      const current = sortedWords[i];
+      const next = sortedWords[i + 1];
+
+      // Shift current by cumulative
+      current.start = Number(Math.max(0, current.start - cumulativeShift).toFixed(2));
+      current.end = Number(Math.max(current.start + 0.1, current.end - cumulativeShift).toFixed(2));
+
+      const rawGap = next.start - (current.end + cumulativeShift);
+      if (rawGap > 0.4) {
+        const reduction = rawGap - 0.15;
+        cumulativeShift += reduction;
+        savedTime += reduction;
+      }
+    }
+
+    if (sortedWords.length > 0) {
+      const last = sortedWords[sortedWords.length - 1];
+      last.start = Number(Math.max(0, last.start - cumulativeShift).toFixed(2));
+      last.end = Number(Math.max(last.start + 0.1, last.end - cumulativeShift).toFixed(2));
+    }
+
+    setWords(sortedWords);
+    const newDuration = Math.max(5, duration - savedTime);
+    setDuration(Number(newDuration.toFixed(1)));
+
+    confetti({ particleCount: 50, spread: 60 });
+    addToast(
+      'success',
+      'Wordless Silences Shortened',
+      `Underlord trimmed ${savedTime.toFixed(1)}s of dead air across the project timeline.`
+    );
   };
 
   const applyClarityEdit = () => {
-    // Trim verbose words (e.g., words w29-w37)
+    // Trim verbose words (e.g., words w31-w34)
     setWords((prev) =>
       prev.map((w) => {
         if (['w31', 'w32', 'w33'].includes(w.id)) {
@@ -281,6 +401,11 @@ export const EditorView: React.FC<EditorViewProps> = ({
       })
     );
     confetti({ particleCount: 50, spread: 60 });
+    addToast(
+      'success',
+      'Clarity Trim Applied',
+      'Underlord removed redundant filler phrase for faster viewer hook retention.'
+    );
   };
 
   const insertOverdub = (newTokens: WordToken[]) => {
@@ -295,11 +420,51 @@ export const EditorView: React.FC<EditorViewProps> = ({
   };
 
   const handleSplitAtPlayhead = () => {
-    confetti({ particleCount: 20, spread: 30 });
+    // Real timeline clip splitting
+    let splitOccurred = false;
+    const updatedTracks = tracks.map((track) => {
+      const clipIndex = track.clips.findIndex(
+        (c) => currentTime > c.startTime && currentTime < c.startTime + c.duration
+      );
+
+      if (clipIndex !== -1) {
+        splitOccurred = true;
+        const targetClip = track.clips[clipIndex];
+        const firstDuration = currentTime - targetClip.startTime;
+        const secondDuration = targetClip.duration - firstDuration;
+
+        const clipA = {
+          ...targetClip,
+          duration: Number(firstDuration.toFixed(2)),
+        };
+
+        const clipB = {
+          ...targetClip,
+          id: `clip-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          startTime: Number(currentTime.toFixed(2)),
+          duration: Number(secondDuration.toFixed(2)),
+          title: `${targetClip.title} (Part 2)`,
+        };
+
+        const newClips = [...track.clips];
+        newClips.splice(clipIndex, 1, clipA, clipB);
+        return { ...track, clips: newClips };
+      }
+      return track;
+    });
+
+    if (splitOccurred) {
+      setTracks(updatedTracks);
+      confetti({ particleCount: 25, spread: 40 });
+      addToast('info', 'Clip Split at Playhead', `Divided timeline tracks at ${formatTime(currentTime)}.`);
+    } else {
+      addToast('info', 'Playhead Position', `Position playhead inside a clip to split at ${formatTime(currentTime)}.`);
+    }
   };
 
   const handleAddComment = (c: CommentItem) => {
     setComments([c, ...comments]);
+    addToast('success', 'Comment Added', `Timecoded note posted at ${formatTime(c.timecode)}.`);
   };
 
   const handleToggleResolve = (id: string) => {
@@ -312,13 +477,39 @@ export const EditorView: React.FC<EditorViewProps> = ({
     const newAngle: MulticamAngle = {
       id: `angle-${Date.now()}`,
       name: title,
-      speaker: 'Screen/Cam',
+      speaker: 'Host Screen',
       videoUrl: url,
       thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80',
     };
     setMulticamAngles([...multicamAngles, newAngle]);
     setActiveAngleId(newAngle.id);
+    addToast('success', 'Recording Synced to Studio', `Imported "${title}" as an active multicam angle.`);
   };
+
+  // Group chronological speaker dialogue turns
+  const speakerTurns = useMemo(() => {
+    const turns: SpeakerTurn[] = [];
+    let currentTurn: SpeakerTurn | null = null;
+
+    for (const word of words) {
+      if (!currentTurn || currentTurn.speaker !== word.speaker) {
+        currentTurn = {
+          speaker: word.speaker,
+          avatar:
+            word.speaker === 'Sarah'
+              ? 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=60&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&q=80',
+          cameraLabel: word.speaker === 'Sarah' ? 'Guest (Camera B)' : 'Host (Camera A)',
+          startTime: word.start,
+          words: [word],
+        };
+        turns.push(currentTurn);
+      } else {
+        currentTurn.words.push(word);
+      }
+    }
+    return turns;
+  }, [words]);
 
   // Active word token calculation
   const activeWords = words.filter((w) => !w.deleted);
@@ -342,6 +533,9 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
   return (
     <div className="flex flex-col h-screen bg-[#0e1118] text-slate-100 font-sans overflow-hidden select-none">
+      {/* Toast Notification Container */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
       {/* Top Header Bar */}
       <header className="h-14 px-4 border-b border-white/[0.08] bg-[#121622] flex items-center justify-between z-20 shrink-0">
         <div className="flex items-center gap-3">
@@ -417,6 +611,20 @@ export const EditorView: React.FC<EditorViewProps> = ({
           >
             <Type className="w-3.5 h-3.5" />
             <span>Captions</span>
+          </button>
+
+          {/* Canvas Effects & Transitions button */}
+          <button
+            onClick={() => setIsTransitionsOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              backgroundRemovalEnabled || studioLightingEnabled
+                ? 'bg-amber-600/25 text-amber-300 border border-amber-500/30'
+                : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
+            }`}
+            title="Canvas Effects, AI Green Screen & Transitions"
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-400" />
+            <span>Effects</span>
           </button>
 
           {/* Multicam button */}
@@ -534,14 +742,14 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   type="text"
                   value={searchWordQuery}
                   onChange={(e) => setSearchWordQuery(e.target.value)}
-                  placeholder="Find word..."
-                  className="pl-7 pr-2 py-1 rounded-lg bg-black/40 border border-white/10 text-[11px] text-white focus:outline-none focus:border-indigo-500 w-28"
+                  placeholder="Find word in script..."
+                  className="pl-7 pr-2 py-1 rounded-lg bg-black/40 border border-white/10 text-[11px] text-white focus:outline-none focus:border-indigo-500 w-36"
                 />
               </div>
 
               <button
                 onClick={() => setShowDeletedWords(!showDeletedWords)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
                   showDeletedWords ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -559,7 +767,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
             </div>
           </div>
 
-          {/* Transcript Document View */}
+          {/* Transcript Document View (Strictly Chronological Speaker Turns) */}
           <div className="flex-1 overflow-y-auto p-8 space-y-6 text-sm leading-relaxed font-sans">
             {/* Scene Header */}
             <div className="space-y-4">
@@ -570,27 +778,36 @@ export const EditorView: React.FC<EditorViewProps> = ({
                 <span className="text-xs text-slate-400 font-medium">00:00 - {formatTime(duration)}</span>
               </div>
 
-              {/* Grouped by speaker */}
+              {/* Chronological Speaker Turns */}
               <div className="space-y-4">
-                {/* Speaker 1 (Alex) */}
-                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&q=80"
-                      alt="Alex"
-                      className="w-5 h-5 rounded-full object-cover"
-                    />
-                    <span className="text-xs font-bold text-white">Alex Rivera</span>
-                    <span className="text-[10px] text-slate-500">Host (Camera A)</span>
-                  </div>
+                {speakerTurns.map((turn, turnIdx) => (
+                  <div
+                    key={turnIdx}
+                    className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2 hover:border-white/[0.1] transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={turn.avatar}
+                          alt={turn.speaker}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                        <span className="text-xs font-bold text-white">{turn.speaker}</span>
+                        <span className="text-[10px] text-slate-500">{turn.cameraLabel}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {formatTime(turn.startTime)}
+                      </span>
+                    </div>
 
-                  <div className="flex flex-wrap gap-1.5 text-slate-200 text-sm">
-                    {words
-                      .filter((w) => w.speaker === 'Alex')
-                      .map((word) => {
+                    <div className="flex flex-wrap gap-1.5 text-slate-200 text-sm">
+                      {turn.words.map((word) => {
                         const isSelected = selectedWordId === word.id;
                         const isCurrentlyPlaying =
                           currentTime >= word.start && currentTime <= word.end;
+                        const matchesSearch =
+                          searchWordQuery.trim() !== '' &&
+                          word.text.toLowerCase().includes(searchWordQuery.toLowerCase());
 
                         if (word.deleted && !showDeletedWords) return null;
 
@@ -601,6 +818,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
                             className={`px-1.5 py-0.5 rounded cursor-pointer transition-all inline-flex items-center gap-1 ${
                               word.deleted
                                 ? 'line-through text-red-400/60 bg-red-950/20'
+                                : matchesSearch
+                                ? 'ring-2 ring-yellow-400 bg-yellow-400/20 text-yellow-200 font-semibold'
                                 : isCurrentlyPlaying
                                 ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30 scale-105'
                                 : isSelected
@@ -626,58 +845,9 @@ export const EditorView: React.FC<EditorViewProps> = ({
                           </span>
                         );
                       })}
+                    </div>
                   </div>
-                </div>
-
-                {/* Speaker 2 (Sarah) */}
-                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=60&q=80"
-                      alt="Sarah"
-                      className="w-5 h-5 rounded-full object-cover"
-                    />
-                    <span className="text-xs font-bold text-white">Sarah Chen</span>
-                    <span className="text-[10px] text-slate-500">Guest (Camera B)</span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5 text-slate-200 text-sm">
-                    {words
-                      .filter((w) => w.speaker === 'Sarah')
-                      .map((word) => {
-                        const isSelected = selectedWordId === word.id;
-                        const isCurrentlyPlaying =
-                          currentTime >= word.start && currentTime <= word.end;
-
-                        if (word.deleted && !showDeletedWords) return null;
-
-                        return (
-                          <span
-                            key={word.id}
-                            onClick={() => handleWordClick(word)}
-                            className={`px-1.5 py-0.5 rounded cursor-pointer transition-all inline-flex items-center gap-1 ${
-                              word.deleted
-                                ? 'line-through text-red-400/60 bg-red-950/20'
-                                : isCurrentlyPlaying
-                                ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30 scale-105'
-                                : isSelected
-                                ? 'bg-white/20 text-white ring-1 ring-white/50'
-                                : word.isFiller
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'hover:bg-white/[0.08] hover:text-white'
-                            }`}
-                          >
-                            <span>{word.text}</span>
-                            {word.isFiller && (
-                              <span className="text-[8px] uppercase font-mono px-1 rounded bg-amber-500 text-slate-950">
-                                filler
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -723,7 +893,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
             {/* Multicam Angle Name */}
             <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-black/70 border border-white/10 text-[10px] font-mono text-slate-300">
-              {activeAngle.name}
+              {activeAngle?.name || 'Camera 1'}
             </div>
 
             {/* Dynamic Captions Render on Canvas */}
@@ -793,10 +963,10 @@ export const EditorView: React.FC<EditorViewProps> = ({
           setAspectRatio('9:16');
           setCaptions({ ...captions, style: 'neon', fontSize: 32 });
           confetti({ particleCount: 50, spread: 60 });
-          alert('Switched to 9:16 Vertical Reel mode with Neon Captions!');
+          addToast('success', 'Social Mode Active', 'Switched to 9:16 Vertical Reel with Neon Captions.');
         }}
         onTranslate={(lang) => {
-          alert(`Transcript synchronized in ${lang} with translated dynamic captions!`);
+          addToast('success', `Transcript Translated to ${lang}`, 'Dynamic karaoke captions synchronized.');
         }}
         onSelectWord={handleWordClick}
       />
@@ -805,7 +975,12 @@ export const EditorView: React.FC<EditorViewProps> = ({
         isOpen={isStudioSoundOpen}
         onClose={() => setIsStudioSoundOpen(false)}
         config={studioSound}
-        onChange={setStudioSound}
+        onChange={(cfg) => {
+          setStudioSound(cfg);
+          if (audioEngineRef.current) {
+            audioEngineRef.current.updateConfig(cfg);
+          }
+        }}
         isPlaying={isPlaying}
       />
 
@@ -814,6 +989,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
         onClose={() => setIsVoiceCloningOpen(false)}
         onInsertOverdub={insertOverdub}
         currentTime={currentTime}
+        onNotify={(msg, desc) => addToast('success', msg, desc)}
       />
 
       <EyeContactModal
@@ -835,9 +1011,15 @@ export const EditorView: React.FC<EditorViewProps> = ({
         onClose={() => setIsMulticamOpen(false)}
         angles={multicamAngles}
         activeAngleId={activeAngleId}
-        onSelectAngle={setActiveAngleId}
+        onSelectAngle={(id) => {
+          setActiveAngleId(id);
+          addToast('info', 'Camera Switched', `Switched active director angle to ${multicamAngles.find(a => a.id === id)?.name}`);
+        }}
         isAutoSpeakerCut={isAutoSpeakerCut}
-        onToggleAutoSpeakerCut={() => setIsAutoSpeakerCut(!isAutoSpeakerCut)}
+        onToggleAutoSpeakerCut={() => {
+          setIsAutoSpeakerCut(!isAutoSpeakerCut);
+          addToast('info', 'Auto-Speaker Cut', !isAutoSpeakerCut ? 'AI auto-cut enabled' : 'Manual angle lock active');
+        }}
       />
 
       <TeleprompterView
@@ -868,19 +1050,29 @@ export const EditorView: React.FC<EditorViewProps> = ({
       <EnterpriseExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
-        projectTitle={project.title}
-        duration={duration}
+        project={project}
+        words={words}
+        onNotify={(msg, desc) => addToast('success', msg, desc)}
       />
 
       <CanvasTransitionsModal
         isOpen={isTransitionsOpen}
         onClose={() => setIsTransitionsOpen(false)}
         selectedTransition={selectedTransition}
-        onSelectTransition={setSelectedTransition}
+        onSelectTransition={(t) => {
+          setSelectedTransition(t);
+          addToast('info', 'Transition Applied', `Active scene transition set to ${t}.`);
+        }}
         backgroundRemovalEnabled={backgroundRemovalEnabled}
-        onToggleBackgroundRemoval={() => setBackgroundRemovalEnabled(!backgroundRemovalEnabled)}
+        onToggleBackgroundRemoval={() => {
+          setBackgroundRemovalEnabled(!backgroundRemovalEnabled);
+          addToast('info', 'AI Green Screen', !backgroundRemovalEnabled ? 'Room background blurred/isolated' : 'Green screen disabled');
+        }}
         studioLightingEnabled={studioLightingEnabled}
-        onToggleStudioLighting={() => setStudioLightingEnabled(!studioLightingEnabled)}
+        onToggleStudioLighting={() => {
+          setStudioLightingEnabled(!studioLightingEnabled);
+          addToast('info', 'Studio Lighting', !studioLightingEnabled ? 'Virtual key light enabled' : 'Studio lighting disabled');
+        }}
       />
     </div>
   );

@@ -21,6 +21,7 @@ interface VoiceCloningModalProps {
   onClose: () => void;
   onInsertOverdub: (words: WordToken[]) => void;
   currentTime: number;
+  onNotify?: (msg: string, desc?: string) => void;
 }
 
 export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
@@ -28,6 +29,7 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
   onClose,
   onInsertOverdub,
   currentTime,
+  onNotify,
 }) => {
   const [voices, setVoices] = useState<VoiceClone[]>(SAMPLE_VOICE_CLONES);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(SAMPLE_VOICE_CLONES[0].id);
@@ -43,11 +45,40 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
 
   if (!isOpen) return null;
 
+  const playVoicePreview = (voice: VoiceClone) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsPlayingPreview(voice.id);
+
+      const utterance = new SpeechSynthesisUtterance(
+        `Hi there, this is ${voice.name}. My neural voice model is ready to overdub any script edits inside Descript.`
+      );
+      utterance.rate = 1.0;
+      utterance.pitch = voice.name.includes('Sarah') || voice.name.includes('Emma') ? 1.2 : 0.95;
+
+      utterance.onend = () => setIsPlayingPreview(null);
+      utterance.onerror = () => setIsPlayingPreview(null);
+
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setIsPlayingPreview(voice.id);
+      setTimeout(() => setIsPlayingPreview(null), 2000);
+    }
+  };
+
   const handleSynthesize = (e: React.FormEvent) => {
     e.preventDefault();
     if (!overdubText.trim()) return;
 
     setIsGenerating(true);
+
+    // Speak overdub text in browser
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(overdubText.trim());
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    }
+
     setTimeout(() => {
       setIsGenerating(false);
 
@@ -71,8 +102,11 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
 
       onInsertOverdub(generatedTokens);
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+      if (onNotify) {
+        onNotify('Overdub Synthesized', `Inserted ${wordsArr.length} tokens into script at ${currentTime.toFixed(1)}s using ${selectedVoice?.name}`);
+      }
       onClose();
-    }, 1000);
+    }, 800);
   };
 
   const handleTrainVoice = (e: React.FormEvent) => {
@@ -97,8 +131,11 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
         setTrainingStatus(null);
         setActiveTab('overdub');
         confetti({ particleCount: 70, spread: 70, origin: { y: 0.5 } });
-      }, 1200);
-    }, 1000);
+        if (onNotify) {
+          onNotify('Custom Voice Trained!', `${newVoice.name} is now available for Overdub.`);
+        }
+      }, 1000);
+    }, 800);
   };
 
   return (
@@ -158,9 +195,12 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
           <form onSubmit={handleSynthesize} className="p-6 space-y-5">
             {/* Voice Selector */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 block">
-                Select Cloned Voice Model
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-300">
+                  Select Cloned Voice Model
+                </label>
+                <span className="text-[10px] text-slate-500">Click speaker icon to listen</span>
+              </div>
               <div className="grid grid-cols-2 gap-2.5 max-h-48 overflow-y-auto pr-1">
                 {voices.map((v) => (
                   <div
@@ -183,9 +223,26 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
                         <div className="text-[10px] text-slate-400 truncate">{v.accent}</div>
                       </div>
                     </div>
-                    {selectedVoiceId === v.id && (
-                      <Check className="w-4 h-4 text-purple-400 shrink-0 ml-1" />
-                    )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playVoicePreview(v);
+                        }}
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                          isPlayingPreview === v.id
+                            ? 'bg-purple-600 text-white animate-pulse'
+                            : 'hover:bg-white/10 text-slate-400 hover:text-white'
+                        }`}
+                        title="Preview Voice Audio"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+                      {selectedVoiceId === v.id && (
+                        <Check className="w-4 h-4 text-purple-400 shrink-0 ml-0.5" />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -228,7 +285,7 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
               <button
                 type="submit"
                 disabled={!overdubText.trim() || isGenerating}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-40 text-white text-xs font-semibold transition-all shadow-lg shadow-purple-600/25 flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-40 text-white text-xs font-semibold transition-all shadow-lg shadow-purple-600/25 flex items-center gap-2 cursor-pointer"
               >
                 {isGenerating ? (
                   <>
@@ -254,51 +311,44 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
                 type="text"
                 value={newVoiceName}
                 onChange={(e) => setNewVoiceName(e.target.value)}
-                placeholder="e.g. Alex Studio Master 2026"
-                className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                placeholder="e.g. My Studio Voice (Alex)"
+                required
+                className="w-full px-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300 block">
-                Vocal Cadence / Regional Accent
+                Primary Regional Accent
               </label>
               <select
                 value={newVoiceAccent}
                 onChange={(e) => setNewVoiceAccent(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-purple-500"
+                className="w-full px-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
               >
-                <option value="US Neutral">US Neutral Broadcast</option>
-                <option value="UK Standard">British BBC Standard</option>
-                <option value="Australian">Australian Sydney</option>
-                <option value="European English">Euro International</option>
+                <option value="US West Coast">US West Coast / Tech</option>
+                <option value="US Neutral">US General Neutral</option>
+                <option value="UK Standard">British Received Pronunciation</option>
+                <option value="Australian">Australian Standard</option>
+                <option value="Global Neutral">Global English Accent</option>
               </select>
             </div>
 
-            <div className="p-4 rounded-xl border border-dashed border-white/20 bg-white/[0.02] text-center space-y-2">
-              <FileAudio className="w-8 h-8 mx-auto text-purple-400/80" />
-              <div className="text-xs text-white font-medium">
-                Record or Upload 30-Second Vocal Sample
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Read our standard training passage naturally. Descript trains your custom AI model in ~30 seconds.
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
+              <div className="text-xs font-semibold text-slate-200">Consent & Voice Training Script</div>
+              <p className="text-[11px] text-slate-400 italic">
+                "I hereby authorize Descript to create an AI voice model of my speech for the exclusive purpose of script editing and overdub in my workspace."
               </p>
-              <button
-                type="button"
-                className="px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-xs text-slate-200 font-medium transition-colors"
-              >
-                Choose WAV or MP3 File
-              </button>
             </div>
 
             {trainingStatus && (
-              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-300 flex items-center gap-2">
-                <RotateCw className="w-4 h-4 animate-spin text-purple-400" />
+              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/40 text-xs text-purple-300 flex items-center gap-2">
+                <RotateCw className="w-4 h-4 animate-spin text-purple-400 shrink-0" />
                 <span>{trainingStatus}</span>
               </div>
             )}
 
-            <div className="pt-2 flex justify-end gap-3">
+            <div className="pt-2 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setActiveTab('overdub')}
@@ -309,9 +359,10 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
               <button
                 type="submit"
                 disabled={!newVoiceName.trim() || !!trainingStatus}
-                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs font-semibold transition-colors shadow-lg shadow-purple-600/25"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 disabled:opacity-40 text-white text-xs font-semibold shadow-lg shadow-purple-600/25 flex items-center gap-2 cursor-pointer"
               >
-                Train Custom Model
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Train 30s Voice Model</span>
               </button>
             </div>
           </form>

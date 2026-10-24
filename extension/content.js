@@ -9,6 +9,7 @@
   let timerInterval = null;
   let elapsedSeconds = 0;
   let isPaused = false;
+  let currentConfig = null;
 
   let toolbarEl = null;
   let camBubbleEl = null;
@@ -16,6 +17,7 @@
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'START_DESCRIPT_RECORDING') {
+      currentConfig = request.payload;
       initiateRecording(request.payload);
       sendResponse({ status: 'STARTED' });
     }
@@ -197,6 +199,7 @@
 
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const videoUrl = URL.createObjectURL(blob);
+    const studioUrl = (currentConfig && currentConfig.studioUrl) || 'http://localhost:5173';
 
     modalEl = document.createElement('div');
     modalEl.id = 'descript-completed-modal-backdrop';
@@ -229,8 +232,53 @@
     });
 
     document.getElementById('descript-open-studio-btn').addEventListener('click', () => {
-      // Open Descript Webapp
-      window.open('http://localhost:5173', '_blank');
+      const title = `Extension Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      
+      // 1. Broadcast to any open Descript tabs
+      try {
+        if ('BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('descript_companion_sync');
+          channel.postMessage({
+            type: 'RECORDING_COMPLETED',
+            payload: {
+              title,
+              videoUrl,
+              duration: elapsedSeconds || 15,
+              timestamp: Date.now(),
+              mode: currentConfig ? currentConfig.mode : 'screen-cam',
+            },
+          });
+        }
+      } catch (e) {
+        console.warn('Broadcast sync error:', e);
+      }
+
+      // 2. Open Descript Web Studio with query parameters for direct auto-import
+      const targetUrl = new URL(studioUrl);
+      targetUrl.searchParams.set('import_recording', 'true');
+      targetUrl.searchParams.set('title', title);
+      targetUrl.searchParams.set('duration', (elapsedSeconds || 15).toString());
+
+      const openedWin = window.open(targetUrl.toString(), '_blank');
+      
+      // 3. PostMessage once opened
+      if (openedWin) {
+        setTimeout(() => {
+          openedWin.postMessage(
+            {
+              type: 'DESCRIPT_EXTENSION_RECORDING',
+              payload: {
+                title,
+                videoUrl,
+                duration: elapsedSeconds || 15,
+                timestamp: Date.now(),
+              },
+            },
+            '*'
+          );
+        }, 1200);
+      }
+
       modalEl.remove();
     });
   }

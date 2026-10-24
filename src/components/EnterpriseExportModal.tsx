@@ -13,10 +13,19 @@ import {
   Copy, 
   RotateCw,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { ExportSettings } from '../types';
+import { Project, WordToken, ExportSettings } from '../types';
+import { 
+  generateSRT, 
+  generateVTT, 
+  generateJSONTimestamps, 
+  generatePremiereXML, 
+  generateFCPXML, 
+  generateEDL 
+} from '../utils/exportGenerators';
 
 const YouTubeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -27,15 +36,17 @@ const YouTubeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
 interface EnterpriseExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projectTitle: string;
-  duration: number;
+  project: Project;
+  words: WordToken[];
+  onNotify?: (msg: string, desc?: string) => void;
 }
 
 export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
   isOpen,
   onClose,
-  projectTitle,
-  duration,
+  project,
+  words,
+  onNotify,
 }) => {
   const [activeTab, setActiveTab] = useState<'export' | 'publish' | 'timeline'>('export');
   const [settings, setSettings] = useState<ExportSettings>({
@@ -53,19 +64,21 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
   const [renderStage, setRenderStage] = useState('');
   const [isRenderComplete, setIsRenderComplete] = useState(false);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [downloadSuccessItem, setDownloadSuccessItem] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleStartRender = () => {
     setIsRendering(true);
+    setIsRenderComplete(false);
     setRenderProgress(5);
     setRenderStage('Extracting audio & speech tokens...');
 
     const stages = [
-      { at: 20, stage: 'Applying Studio Sound neural remaster...' },
+      { at: 20, stage: 'Applying Studio Sound neural remaster (-14 LUFS)...' },
       { at: 45, stage: 'Rendering dynamic karaoke captions...' },
       { at: 70, stage: 'Multiplexing 4K video frames & audio streams...' },
-      { at: 90, stage: 'Finalizing ProRes / MP4 container encoding...' },
+      { at: 90, stage: 'Finalizing container encoding (ProRes / MP4)...' },
       { at: 100, stage: 'Export Complete!' }
     ];
 
@@ -84,18 +97,58 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
           spread: 70,
           origin: { y: 0.5 }
         });
+        if (onNotify) {
+          onNotify('Render Complete!', `${project.title} exported as ${settings.format.toUpperCase()} (${settings.resolution})`);
+        }
       }
     }, 400);
   };
 
+  const handleDownloadRenderedMedia = () => {
+    const videoUrl = project.scenes[0]?.videoClipUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    const a = document.createElement('a');
+    a.href = videoUrl;
+    a.download = `${project.title.toLowerCase().replace(/\s+/g, '-')}.${settings.format}`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    if (onNotify) {
+      onNotify('Download Started', `Saving ${settings.format.toUpperCase()} to your device.`);
+    }
+  };
+
+  const handleDownloadTimelineFile = (title: string, ext: string, content: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.title.toLowerCase().replace(/\s+/g, '-')}${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setDownloadSuccessItem(title);
+    setTimeout(() => setDownloadSuccessItem(null), 2500);
+
+    if (onNotify) {
+      onNotify(`Exported ${title}`, `Saved ${ext} with ${words.filter(w => !w.deleted).length} synchronized tokens.`);
+    }
+  };
+
   const handleCopyLink = () => {
-    navigator.clipboard?.writeText(`https://web.descript.com/share/${projectTitle.toLowerCase().replace(/\s+/g, '-')}-4k`);
+    const shareUrl = `https://web.descript.com/share/${project.title.toLowerCase().replace(/\s+/g, '-')}-4k`;
+    navigator.clipboard?.writeText(shareUrl);
     setShareLinkCopied(true);
     setTimeout(() => setShareLinkCopied(false), 2000);
+    if (onNotify) {
+      onNotify('Share Link Copied', shareUrl);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="w-full max-w-xl bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
@@ -139,7 +192,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
               activeTab === 'timeline' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Timeline & Subtitles (FCPXML / SRT)
+            NLE Timelines & Subtitles
           </button>
           <button
             onClick={() => setActiveTab('publish')}
@@ -147,149 +200,122 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
               activeTab === 'publish' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            Publish to Web / YouTube
+            Cloud Share & Platforms
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 space-y-5">
-          {isRendering ? (
-            <div className="py-8 space-y-4 text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                <RotateCw className="w-8 h-8 animate-spin" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-bold text-sm text-white">Rendering {settings.format.toUpperCase()}</h4>
-                <p className="text-xs text-indigo-300 font-medium">{renderStage}</p>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-black/60 rounded-full h-3 border border-white/10 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-full transition-all duration-300 rounded-full"
-                  style={{ width: `${renderProgress}%` }}
-                />
-              </div>
-              <div className="text-[11px] font-mono text-slate-400">{renderProgress}% complete</div>
-            </div>
-          ) : isRenderComplete ? (
-            <div className="py-8 space-y-4 text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <Check className="w-8 h-8" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-bold text-sm text-white">Export Ready for Download!</h4>
-                <p className="text-xs text-slate-400">
-                  {projectTitle} • {settings.format.toUpperCase()} ({settings.resolution}) • {duration.toFixed(1)}s
-                </p>
-              </div>
-
-              <div className="flex items-center justify-center gap-3 pt-2">
-                <a
-                  href="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-                  download={`${projectTitle}.${settings.format}`}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-emerald-600/25 flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download Master File</span>
-                </a>
-                <button
-                  onClick={() => setIsRenderComplete(false)}
-                  className="px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-xs font-semibold"
-                >
-                  Configure Another Export
-                </button>
-              </div>
-            </div>
-          ) : activeTab === 'export' ? (
-            <div className="space-y-4">
-              {/* Format grid */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 block">Export Format</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { id: 'mp4', name: 'MP4 (H.264)', desc: 'Standard Web' },
-                    { id: 'prores', name: 'Apple ProRes', desc: '422 HQ Master' },
-                    { id: 'webm', name: 'WebM (VP9)', desc: 'Lightweight' },
-                    { id: 'wav', name: 'WAV 48kHz', desc: 'Lossless Audio' },
-                  ].map((fmt) => (
-                    <button
-                      key={fmt.id}
-                      onClick={() => setSettings({ ...settings, format: fmt.id as any })}
-                      className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
-                        settings.format === fmt.id
-                          ? 'bg-indigo-950/40 border-indigo-500/70 text-white'
-                          : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:border-white/20'
-                      }`}
-                    >
-                      <div className="text-xs font-bold text-white">{fmt.name}</div>
-                      <div className="text-[10px] text-slate-400">{fmt.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Resolution & FPS */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-300 block">Resolution</label>
+        {/* Tab Body */}
+        <div className="p-6">
+          {activeTab === 'export' ? (
+            <div className="space-y-5">
+              {/* Format & Resolution selectors */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Export Format</label>
                   <select
-                    value={settings.resolution}
-                    onChange={(e) => setSettings({ ...settings, resolution: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    value={settings.format}
+                    onChange={(e) => setSettings({ ...settings, format: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="4k">4K Ultra HD (3840x2160)</option>
-                    <option value="1080p">1080p Full HD (1920x1080)</option>
-                    <option value="720p">720p HD (1280x720)</option>
+                    <option value="mp4">MP4 (H.264 / AAC High)</option>
+                    <option value="prores">Apple ProRes 422 HQ (Broadcast)</option>
+                    <option value="webm">WebM (VP9 / Opus Alpha)</option>
+                    <option value="wav">Broadcast WAV (24-bit 48kHz)</option>
+                    <option value="mp3">MP3 (320kbps Master)</option>
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-300 block">Framerate</label>
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 mb-1.5 block">Resolution</label>
                   <select
-                    value={settings.fps}
-                    onChange={(e) => setSettings({ ...settings, fps: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    value={settings.resolution}
+                    onChange={(e) => setSettings({ ...settings, resolution: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="24">24 fps (Cinematic)</option>
-                    <option value="30">30 fps (Web Standard)</option>
-                    <option value="60">60 fps (High Smoothness)</option>
+                    <option value="4k">4K Ultra HD (3840 × 2160)</option>
+                    <option value="1080p">1080p Full HD (1920 × 1080)</option>
+                    <option value="720p">720p HD (1280 × 720)</option>
+                    <option value="audio_only">Audio Only Master</option>
                   </select>
                 </div>
               </div>
 
               {/* Toggles */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-2">
                 <div
                   onClick={() => setSettings({ ...settings, burnCaptions: !settings.burnCaptions })}
-                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer hover:border-white/20 transition-colors"
+                  className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                    settings.burnCaptions ? 'bg-indigo-950/30 border-indigo-500/40' : 'bg-white/[0.02] border-white/[0.06]'
+                  }`}
                 >
                   <div>
-                    <span className="text-xs font-semibold text-white block">Burn-in Dynamic Captions</span>
-                    <span className="text-[11px] text-slate-400">Hardcodes animated karaoke captions directly onto video pixels</span>
+                    <span className="text-xs font-medium text-white block">Burn-in Dynamic Captions</span>
+                    <span className="text-[11px] text-slate-400">Embeds viral bouncing karaoke subtitles into frames</span>
                   </div>
-                  {settings.burnCaptions && <Check className="w-4 h-4 text-emerald-400" />}
+                  {settings.burnCaptions && <Check className="w-4 h-4 text-indigo-400" />}
                 </div>
 
                 <div
                   onClick={() => setSettings({ ...settings, includeStudioSound: !settings.includeStudioSound })}
-                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer hover:border-white/20 transition-colors"
+                  className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                    settings.includeStudioSound ? 'bg-emerald-950/30 border-emerald-500/40' : 'bg-white/[0.02] border-white/[0.06]'
+                  }`}
                 >
                   <div>
-                    <span className="text-xs font-semibold text-white block">Include Studio Sound Processing</span>
+                    <span className="text-xs font-medium text-white block">Include Studio Sound Remaster</span>
                     <span className="text-[11px] text-slate-400">Renders noise-canceled, echo-reduced vocal master</span>
                   </div>
                   {settings.includeStudioSound && <Check className="w-4 h-4 text-emerald-400" />}
                 </div>
               </div>
 
-              {/* Action */}
-              <button
-                onClick={handleStartRender}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-95 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/25 cursor-pointer"
-              >
-                Start Production Render
-              </button>
+              {/* Rendering Progress or Action Button */}
+              {isRendering ? (
+                <div className="p-4 rounded-xl bg-black/50 border border-indigo-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-indigo-300 font-semibold flex items-center gap-2">
+                      <RotateCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      {renderStage}
+                    </span>
+                    <span className="font-mono text-white font-bold">{renderProgress}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                      style={{ width: `${renderProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : isRenderComplete ? (
+                <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/50 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Production Master Ready!</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleDownloadRenderedMedia}
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download {settings.format.toUpperCase()} Master</span>
+                    </button>
+                    <button
+                      onClick={handleStartRender}
+                      className="px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium cursor-pointer"
+                    >
+                      Re-render
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStartRender}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-95 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/25 cursor-pointer"
+                >
+                  Start Production Render
+                </button>
+              )}
             </div>
           ) : activeTab === 'timeline' ? (
             <div className="space-y-4">
@@ -299,37 +325,103 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { title: 'Premiere Pro XML', ext: '.xml', desc: 'Full cuts and audio synced' },
-                  { title: 'Final Cut Pro X', ext: '.fcpxml', desc: 'Apple FCP timeline export' },
-                  { title: 'DaVinci Resolve', ext: '.edl', desc: 'Color grading decision list' },
-                  { title: 'SubRip Subtitles', ext: '.srt', desc: 'Universal subtitle track' },
-                  { title: 'WebVTT Captions', ext: '.vtt', desc: 'Web HTML5 video captions' },
-                  { title: 'JSON Word Timestamps', ext: '.json', desc: 'Token-level millisecond data' },
-                ].map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="text-xs font-semibold text-white">{item.title}</div>
-                      <div className="text-[10px] text-slate-400">{item.desc}</div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const blob = new Blob([`Exported ${item.title} for ${projectTitle}`], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${projectTitle}${item.ext}`;
-                        a.click();
-                      }}
-                      className="p-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-xs transition-colors"
-                      title="Download"
+                  {
+                    title: 'Premiere Pro XML',
+                    ext: '.xml',
+                    desc: 'Full cuts and audio synced',
+                    action: () =>
+                      handleDownloadTimelineFile(
+                        'Premiere Pro XML',
+                        '.xml',
+                        generatePremiereXML(project, words),
+                        'application/xml'
+                      ),
+                  },
+                  {
+                    title: 'Final Cut Pro X',
+                    ext: '.fcpxml',
+                    desc: 'Apple FCP v1.9 interchange',
+                    action: () =>
+                      handleDownloadTimelineFile(
+                        'Final Cut Pro X',
+                        '.fcpxml',
+                        generateFCPXML(project, words),
+                        'application/xml'
+                      ),
+                  },
+                  {
+                    title: 'DaVinci Resolve',
+                    ext: '.edl',
+                    desc: 'CMX 3600 decision list',
+                    action: () =>
+                      handleDownloadTimelineFile(
+                        'DaVinci Resolve EDL',
+                        '.edl',
+                        generateEDL(project, words),
+                        'text/plain'
+                      ),
+                  },
+                  {
+                    title: 'SubRip Subtitles',
+                    ext: '.srt',
+                    desc: 'Universal subtitle format',
+                    action: () =>
+                      handleDownloadTimelineFile(
+                        'SubRip Subtitles',
+                        '.srt',
+                        generateSRT(words),
+                        'text/plain'
+                      ),
+                  },
+                  {
+                    title: 'WebVTT Captions',
+                    ext: '.vtt',
+                    desc: 'HTML5 video caption format',
+                    action: () =>
+                      handleDownloadTimelineFile(
+                        'WebVTT Captions',
+                        '.vtt',
+                        generateVTT(words),
+                        'text/vtt'
+                      ),
+                  },
+                  {
+                    title: 'JSON Timestamps',
+                    ext: '.json',
+                    desc: 'Millisecond token dictionary',
+                    action: () =>
+                      handleDownloadTimelineFile(
+                        'JSON Timestamps',
+                        '.json',
+                        generateJSONTimestamps(project, words),
+                        'application/json'
+                      ),
+                  },
+                ].map((item, idx) => {
+                  const isDone = downloadSuccessItem === item.title;
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                      <div>
+                        <div className="text-xs font-semibold text-white">{item.title}</div>
+                        <div className="text-[10px] text-slate-400">{item.desc}</div>
+                      </div>
+                      <button
+                        onClick={item.action}
+                        className={`p-2 rounded-lg text-xs transition-colors cursor-pointer ${
+                          isDone
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-white/[0.06] hover:bg-white/[0.12] text-slate-300'
+                        }`}
+                        title={`Export ${item.title}`}
+                      >
+                        {isDone ? <Check className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -347,7 +439,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value={`https://web.descript.com/share/${projectTitle.toLowerCase().replace(/\s+/g, '-')}`}
+                    value={`https://web.descript.com/share/${project.title.toLowerCase().replace(/\s+/g, '-')}`}
                     className="flex-1 px-3 py-2 rounded-lg bg-black/60 border border-white/10 text-xs font-mono text-slate-300"
                   />
                   <button
@@ -379,9 +471,11 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                   <button
                     onClick={() => {
                       confetti({ particleCount: 50, spread: 60 });
-                      alert('Connected to YouTube Studio! Upload staged in draft mode.');
+                      if (onNotify) {
+                        onNotify('YouTube Studio Connected', 'Video queued in draft mode with timecoded chapters.');
+                      }
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-xs font-medium text-white transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-xs font-medium text-white transition-colors cursor-pointer"
                   >
                     Publish
                   </button>
@@ -400,9 +494,11 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                   <button
                     onClick={() => {
                       confetti({ particleCount: 50, spread: 60 });
-                      alert('Connected to Spotify Podcasters RSS feed! Episode queued.');
+                      if (onNotify) {
+                        onNotify('Spotify Podcasters Connected', 'Audio master uploaded with synced episode transcript.');
+                      }
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-xs font-medium text-white transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] text-xs font-medium text-white transition-colors cursor-pointer"
                   >
                     Publish
                   </button>

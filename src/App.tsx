@@ -1,14 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AuthView } from './components/AuthView';
 import { DashboardView } from './components/DashboardView';
 import { EditorView } from './components/EditorView';
 import { SAMPLE_PROJECTS } from './data/sampleProjects';
 import { Project } from './types';
+import { 
+  ExtensionSyncBridge, 
+  createProjectFromRecording 
+} from './utils/extensionBridge';
 
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Default to logged-in so user experiences workspace immediately
   const [projects, setProjects] = useState<Project[]>(SAMPLE_PROJECTS);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+
+  const bridgeRef = useRef<ExtensionSyncBridge | null>(null);
+
+  // Initialize Chrome Extension companion sync listener & URL auto-importer
+  useEffect(() => {
+    const bridge = new ExtensionSyncBridge();
+    bridgeRef.current = bridge;
+
+    // 1. Check if opened with recording parameters from the extension
+    const urlPayload = bridge.checkForUrlParams();
+    if (urlPayload) {
+      const newProj = createProjectFromRecording(
+        urlPayload.title,
+        urlPayload.videoUrl,
+        urlPayload.duration
+      );
+      setProjects((prev) => [newProj, ...prev]);
+      setActiveProjectId(newProj.id);
+    }
+
+    // 2. Subscribe to live BroadcastChannel / postMessage recordings
+    bridge.subscribe((payload) => {
+      const newProj = createProjectFromRecording(
+        payload.title,
+        payload.videoUrl,
+        payload.duration
+      );
+      setProjects((prev) => [newProj, ...prev]);
+      setActiveProjectId(newProj.id);
+    });
+
+    return () => {
+      bridge.destroy();
+    };
+  }, []);
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -17,8 +56,8 @@ export const App: React.FC = () => {
       id: `proj-${Date.now()}`,
       title,
       type,
-      duration: 21.0,
-      aspectRatio: type === 'video' ? '16:9' : '16:9',
+      duration: 21.6,
+      aspectRatio: '16:9',
       updatedAt: 'Just now',
       thumbnail:
         type === 'video'
@@ -31,7 +70,7 @@ export const App: React.FC = () => {
           id: `scene-${Date.now()}`,
           title: 'Scene 1',
           startTime: 0,
-          endTime: 21.0,
+          endTime: 21.6,
           words: SAMPLE_PROJECTS[0].scenes[0].words,
           videoClipUrl:
             type === 'video'
@@ -39,8 +78,53 @@ export const App: React.FC = () => {
               : '',
         },
       ],
+      tracks: SAMPLE_PROJECTS[0].tracks,
+      studioSound: {
+        enabled: true,
+        intensity: 85,
+        deReverb: 70,
+        humRemoval: true,
+        loudnessNorm: true,
+        abMode: 'processed',
+      },
+      eyeContact: {
+        enabled: true,
+        intensity: 90,
+        naturalSaccades: true,
+        activeDetected: true,
+      },
+      captions: {
+        enabled: true,
+        style: 'karaoke',
+        highlightColor: '#6366f1',
+        textColor: '#ffffff',
+        fontFamily: 'Sora',
+        fontSize: 28,
+        position: 'bottom',
+        uppercase: false,
+        wordsPerLine: 3,
+        backgroundBox: true,
+        boxColor: '#00000099',
+        textShadow: true,
+      },
+      multicamAngles: SAMPLE_PROJECTS[0].multicamAngles,
+      comments: [],
     };
 
+    setProjects([newProj, ...projects]);
+    setActiveProjectId(newProj.id);
+  };
+
+  const handleImportMedia = (file: File) => {
+    const fileUrl = URL.createObjectURL(file);
+    const title = file.name.replace(/\.[^/.]+$/, '') || 'Imported Media';
+    const newProj = createProjectFromRecording(title, fileUrl, 21.6);
+    setProjects([newProj, ...projects]);
+    setActiveProjectId(newProj.id);
+  };
+
+  const handleSaveRecording = (videoUrl: string, title: string) => {
+    const newProj = createProjectFromRecording(title, videoUrl, 18.0);
     setProjects([newProj, ...projects]);
     setActiveProjectId(newProj.id);
   };
@@ -80,6 +164,8 @@ export const App: React.FC = () => {
       onCreateProject={handleCreateProject}
       onDeleteProject={handleDeleteProject}
       onLogout={() => setIsAuthenticated(false)}
+      onImportMedia={handleImportMedia}
+      onSaveRecording={handleSaveRecording}
     />
   );
 };
