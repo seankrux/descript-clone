@@ -26,6 +26,7 @@ import {
   X
 } from 'lucide-react';
 import { Project, WordToken, CommentItem, CommentReaction } from '../types';
+import { api } from '../utils/apiService';
 
 interface PublicShareViewwayProps {
   project: Project;
@@ -204,6 +205,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
     if (onUpdateProject) {
       onUpdateProject(updatedProject);
     }
+    api.postSharedComment(project.id, newComment.author, newComment.text, newComment.timecode).catch(() => {});
     setCommentText('');
     setPinnedTimecode(null);
   };

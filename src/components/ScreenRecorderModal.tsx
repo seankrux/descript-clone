@@ -154,7 +154,7 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">Descript Screen & Cam Recorder</h3>
+                <h3 className="font-bold text-sm text-white">Descriptivist Screen & Cam Recorder</h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
                   Native WebRTC
                 </span>
@@ -239,7 +239,7 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
                       Ready to record screen, tab, and microphone
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Descript will automatically transcribe the audio and populate the timeline when finished.
+                      Descriptivist will automatically transcribe the audio and populate the timeline when finished.
                     </p>
                   </div>
                 )}

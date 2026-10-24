@@ -53,7 +53,10 @@ async function runBrowserAgentQA() {
     // -------------------------------------------------------------
     console.log('\n--- 1. Testing Dashboard View & Projects Hub ---');
     await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
-    assert((await page.title()).includes('Descript'), 'Page title contains Descript');
+    assert((await page.title()).includes('Descriptivist'), 'Page title contains Descriptivist');
+
+    const brandHeader = await page.$('text=Sean\'s Studio');
+    assert(brandHeader !== null, 'Sean\'s Studio brand workspace header rendered');
 
     const projectCards = await page.$$('.grid > div');
     assert(projectCards.length >= 3, `Found ${projectCards.length} project cards in dashboard`);

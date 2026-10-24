@@ -98,7 +98,7 @@ export const EmbedViewway: React.FC<EmbedViewwayProps> = ({
                 onClick={() => onOpenFullViewway(project.id)}
                 className="flex items-center gap-1 text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
               >
-                <span>Descript Viewway</span>
+                <span>Descriptivist Viewway</span>
                 <ExternalLink className="w-3 h-3" />
               </button>
             )}

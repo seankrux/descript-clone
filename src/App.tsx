@@ -10,6 +10,7 @@ import {
   ExtensionSyncBridge, 
   createProjectFromRecording 
 } from './utils/extensionBridge';
+import { api } from './utils/apiService';
 
 const STORAGE_KEY = 'descript_projects_v2';
 
@@ -39,7 +40,9 @@ export const App: React.FC = () => {
 
   const bridgeRef = useRef<ExtensionSyncBridge | null>(null);
 
-  // Sync projects to localStorage whenever updated
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+
+  // Sync projects to localStorage and cloud backend whenever updated
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -48,7 +51,10 @@ export const App: React.FC = () => {
         console.warn('Failed to save projects to localStorage:', e);
       }
     }
-  }, [projects]);
+    if (activeProject) {
+      api.syncProject(activeProject).catch(() => {});
+    }
+  }, [projects, activeProject]);
 
   // Initialize Chrome Extension companion sync listener & URL auto-importer
   useEffect(() => {
@@ -112,8 +118,6 @@ export const App: React.FC = () => {
       }
     }
   };
-
-  const activeProject = projects.find((p) => p.id === activeProjectId);
 
   const handleCreateProject = (type: 'video' | 'audio', title: string) => {
     const newProj: Project = {

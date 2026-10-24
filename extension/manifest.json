@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Descript Companion - Screen, Cam & Tab Recorder",
-  "version": "1.1.0",
-  "description": "Enterprise-grade screen, floating webcam bubble, and tab audio recorder with instant Descript web studio timeline sync.",
+  "name": "Descriptivist Companion - Screen, Cam & Tab Recorder",
+  "version": "1.2.0",
+  "description": "Enterprise-grade screen, floating webcam bubble, and tab audio recorder with instant Descriptivist studio timeline sync.",
   "permissions": [
     "activeTab",
     "tabCapture",
@@ -11,7 +11,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Record with Descript Companion",
+    "default_title": "Record with Descriptivist Companion",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

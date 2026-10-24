@@ -81,7 +81,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
     setTimeout(() => {
       setIsProcessing(false);
       setSummaryResult({
-        summary: "This episode presents the future of automated video and audio editing. Alex and Sarah demonstrate how Descript replaces cumbersome NLE timelines by treating video like a text document, powered by the Underlord AI copilot for Studio Sound, dynamic captions, and eye contact correction.",
+        summary: "This episode presents the future of automated video and audio editing. Sean and Sarah demonstrate how Descriptivist replaces cumbersome NLE timelines by treating video like a text document, powered by the Underlord AI copilot for Studio Sound, dynamic captions, and eye contact correction.",
         takeaways: [
           "Edit video as easily as editing a Google Doc by cutting text directly.",
           "Underlord AI removes filler words and pauses in a single click.",
@@ -398,7 +398,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 italic">
-                "With Descript, you literally edit your media just by typing and deleting text..."
+                "With Descriptivist, you literally edit your media just by typing and deleting text..."
               </p>
               <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                 <span>00:04.8 - 00:09.6 (4.8s)</span>

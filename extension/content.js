@@ -104,7 +104,7 @@
       </div>
       <div class="descript-btn-divider"></div>
       <button id="descript-pause-btn" class="descript-tool-btn" title="Pause / Resume">⏸</button>
-      <button id="descript-finish-btn" class="descript-finish-btn" title="Finish & Edit in Descript">■ Finish</button>
+      <button id="descript-finish-btn" class="descript-finish-btn" title="Finish & Edit in Descriptivist">■ Finish</button>
       <button id="descript-cancel-btn" class="descript-tool-btn descript-danger" title="Discard">✕</button>
     `;
 
@@ -125,7 +125,7 @@
     camBubbleEl.innerHTML = `
       <video id="descript-cam-video" autoplay playsinline muted></video>
       <div class="descript-bubble-overlay">
-        <span class="descript-bubble-pill">Descript Cam</span>
+        <span class="descript-bubble-pill">Descriptivist Cam</span>
       </div>
     `;
 
@@ -218,8 +218,8 @@
             Duration: ${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s • Auto-Transcribe Ready
           </div>
           <div class="descript-modal-actions">
-            <a href="${videoUrl}" download="descript-capture.webm" class="descript-btn-secondary">Download WebM</a>
-            <button id="descript-open-studio-btn" class="descript-btn-primary">Open in Descript Web Studio ↗</button>
+            <a href="${videoUrl}" download="descriptivist-capture.webm" class="descript-btn-secondary">Download WebM</a>
+            <button id="descript-open-studio-btn" class="descript-btn-primary">Open in Descriptivist Studio ↗</button>
           </div>
         </div>
       </div>

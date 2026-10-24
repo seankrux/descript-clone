@@ -100,7 +100,7 @@ export function createProjectFromRecording(
     { text: 'capture', isFiller: false },
     { text: 'from', isFiller: false },
     { text: 'the', isFiller: false },
-    { text: 'Descript', isFiller: false },
+    { text: 'Descriptivist', isFiller: false },
     { text: 'Companion', isFiller: false },
     { text: 'Chrome', isFiller: false },
     { text: 'extension.', isFiller: false },

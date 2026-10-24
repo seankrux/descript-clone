@@ -31,9 +31,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/>
             </svg>
           </div>
-          <span className="font-semibold text-lg tracking-tight">Descript</span>
+          <span className="font-bold text-lg tracking-tight text-white">Descriptivist</span>
           <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 ml-1">
-            Web v2026.1
+            Studio v2026.1
           </span>
         </div>
 
@@ -51,10 +51,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         <div className="w-full max-w-md bg-[#131722]/90 border border-white/[0.08] p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold tracking-tight text-white mb-2">
-              Welcome to Descript
+              Welcome to Descriptivist
             </h1>
             <p className="text-sm text-slate-400">
-              The AI video and podcast editor that works like a doc.
+              The AI video and podcast editor created by Sean Guillermo.
             </p>
           </div>
 
@@ -160,14 +160,9 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
       {/* Footer */}
       <footer className="px-8 py-5 text-center text-xs text-slate-500 border-t border-white/[0.06] z-10 flex flex-wrap items-center justify-center gap-4">
-        <span>© 2026 Descript, Inc.</span>
-        <a href="https://www.descript.com/terms" target="_blank" rel="noreferrer" className="hover:text-slate-300 underline underline-offset-2">
-          Terms of Service
-        </a>
-        <span>•</span>
-        <a href="https://www.descript.com/privacy" target="_blank" rel="noreferrer" className="hover:text-slate-300 underline underline-offset-2">
-          Privacy Policy
-        </a>
+        <span>© 2026 Descriptivist Studio by Sean Guillermo</span>
+        <span className="text-slate-600">•</span>
+        <span>Enterprise Studio Edition</span>
       </footer>
     </div>
   );

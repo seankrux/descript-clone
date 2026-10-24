@@ -51,7 +51,7 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
       setIsPlayingPreview(voice.id);
 
       const utterance = new SpeechSynthesisUtterance(
-        `Hi there, this is ${voice.name}. My neural voice model is ready to overdub any script edits inside Descript.`
+        `Hi there, this is ${voice.name}. My neural voice model is ready to overdub any script edits inside Descriptivist.`
       );
       utterance.rate = 1.0;
       utterance.pitch = voice.name.includes('Sarah') || voice.name.includes('Emma') ? 1.2 : 0.95;
@@ -337,7 +337,7 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08] space-y-2">
               <div className="text-xs font-semibold text-slate-200">Consent & Voice Training Script</div>
               <p className="text-[11px] text-slate-400 italic">
-                "I hereby authorize Descript to create an AI voice model of my speech for the exclusive purpose of script editing and overdub in my workspace."
+                "I hereby authorize Descriptivist to create an AI voice model of my speech for the exclusive purpose of script editing and overdub in my workspace."
               </p>
             </div>
 

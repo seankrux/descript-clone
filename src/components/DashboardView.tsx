@@ -103,12 +103,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="p-4 border-b border-white/[0.08]">
             <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] cursor-pointer transition-colors">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-xs text-white">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-bold text-xs text-white shadow-md shadow-indigo-500/30">
                   D
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-semibold text-white leading-tight">Alex's Drive</div>
-                  <div className="text-[10px] text-slate-400">Enterprise Studio Plan</div>
+                  <div className="text-xs font-semibold text-white leading-tight">Sean's Studio</div>
+                  <div className="text-[10px] text-slate-400">Descriptivist Enterprise</div>
                 </div>
               </div>
               <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -179,10 +179,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-[11px] font-bold text-indigo-300">
-                A
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-indigo-400/40 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                SG
               </div>
-              <span className="text-xs font-medium text-slate-300">alex@creator.io</span>
+              <div className="text-left">
+                <div className="text-xs font-semibold text-slate-200 leading-none">Sean G</div>
+                <div className="text-[10px] text-slate-400">seanguillermo@gmail.com</div>
+              </div>
             </div>
 
             <button 
@@ -493,7 +496,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <Puzzle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">Descript Companion Extension</h3>
+                  <h3 className="font-bold text-sm text-white">Descriptivist Companion Extension</h3>
                   <span className="text-[10px] text-indigo-300 font-mono">Manifest V3 Chrome Extension</span>
                 </div>
               </div>
@@ -531,7 +534,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Instant sync back into Descript Web Studio via BroadcastChannel & URL auto-import.</span>
+                    <span>Instant sync back into Descriptivist Studio via BroadcastChannel & URL auto-import.</span>
                   </li>
                 </ul>
               </div>

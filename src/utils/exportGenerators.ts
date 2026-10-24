@@ -89,7 +89,7 @@ export function generateSRT(words: WordToken[]): string {
  */
 export function generateVTT(words: WordToken[]): string {
   const cues = groupWordsIntoCues(words);
-  const header = 'WEBVTT - Exported from Descript Enterprise Web Studio\n\n';
+  const header = 'WEBVTT - Exported from Descriptivist Studio\n\n';
   const body = cues
     .map((cue, index) => {
       const idx = index + 1;
@@ -113,7 +113,7 @@ export function generateJSONTimestamps(project: Project, words: WordToken[]): st
     duration: project.duration,
     aspectRatio: project.aspectRatio,
     exportedAt: new Date().toISOString(),
-    generator: 'Descript Enterprise Web Studio v2.4',
+    generator: 'Descriptivist Studio v2.4',
     wordCount: activeWords.length,
     words: activeWords.map((w) => ({
       id: w.id,
@@ -144,7 +144,7 @@ export function generatePremiereXML(project: Project, words: WordToken[]): strin
     <name>${escapeXml(project.title)}</name>
     <children>
       <sequence id="sequence-1">
-        <name>${escapeXml(project.title)} (Descript Cut)</name>
+        <name>${escapeXml(project.title)} (Descriptivist Cut)</name>
         <duration>${totalFrames}</duration>
         <rate>
           <timebase>${fps}</timebase>
@@ -204,7 +204,7 @@ ${activeWords
   .map(
     (w) => `          <marker>
             <name>${escapeXml(w.speaker)}: ${escapeXml(w.text)}</name>
-            <comment>Descript Speech Token</comment>
+            <comment>Descriptivist Speech Token</comment>
             <in>${Math.round(w.start * fps)}</in>
             <out>${Math.round(w.end * fps)}</out>
           </marker>`
@@ -232,7 +232,7 @@ export function generateFCPXML(project: Project, words: WordToken[]): string {
     <asset id="r2" name="${escapeXml(project.title)}" src="${project.scenes[0]?.videoClipUrl || 'media/master.mp4'}" duration="${durationSec}s" hasVideo="1" hasAudio="1"/>
   </resources>
   <library>
-    <event name="Descript Exports">
+    <event name="Descriptivist Exports">
       <project name="${escapeXml(project.title)}">
         <sequence format="r1" duration="${durationSec}s">
           <spine>

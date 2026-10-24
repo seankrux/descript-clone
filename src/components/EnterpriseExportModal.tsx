@@ -430,7 +430,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
               {/* Share link card */}
               <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-white">Descript Cloud Share Link</span>
+                  <span className="text-xs font-semibold text-white">Descriptivist Cloud Share Link</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
                     Public View & Comment
                   </span>
@@ -439,7 +439,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value={`https://web.descript.com/share/${project.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    value={`https://descript-clone-lemon.vercel.app/?share=${project.id}`}
                     className="flex-1 px-3 py-2 rounded-lg bg-black/60 border border-white/10 text-xs font-mono text-slate-300"
                   />
                   <button
