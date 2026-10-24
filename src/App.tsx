@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AuthView } from './components/AuthView';
 import { DashboardView } from './components/DashboardView';
 import { EditorView } from './components/EditorView';
+import { PublicShareViewway } from './components/PublicShareViewway';
+import { EmbedViewway } from './components/EmbedViewway';
 import { SAMPLE_PROJECTS } from './data/sampleProjects';
 import { Project } from './types';
 import { 
@@ -13,11 +15,31 @@ export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Default to logged-in so user experiences workspace immediately
   const [projects, setProjects] = useState<Project[]>(SAMPLE_PROJECTS);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [viewwayConfig, setViewwayConfig] = useState<{
+    mode: 'share' | 'embed' | 'review' | null;
+    projectId: string | null;
+  }>({ mode: null, projectId: null });
 
   const bridgeRef = useRef<ExtensionSyncBridge | null>(null);
 
   // Initialize Chrome Extension companion sync listener & URL auto-importer
   useEffect(() => {
+    // 0. Check URL query parameters for public viewways (?share=, ?embed=, ?review=)
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const shareParam = searchParams.get('share');
+      const embedParam = searchParams.get('embed');
+      const reviewParam = searchParams.get('review');
+
+      if (embedParam) {
+        setViewwayConfig({ mode: 'embed', projectId: embedParam });
+      } else if (reviewParam) {
+        setViewwayConfig({ mode: 'review', projectId: reviewParam });
+      } else if (shareParam) {
+        setViewwayConfig({ mode: 'share', projectId: shareParam });
+      }
+    }
+
     const bridge = new ExtensionSyncBridge();
     bridgeRef.current = bridge;
 
@@ -140,12 +162,53 @@ export const App: React.FC = () => {
     setProjects(projects.map((p) => (p.id === updated.id ? updated : p)));
   };
 
-  // If not logged in, show exact replica of web.descript.com/authenticate
+  // 1. Direct Embed Viewway Mode (?embed=proj-1)
+  if (viewwayConfig.mode === 'embed' && viewwayConfig.projectId) {
+    const targetProject = projects.find((p) => p.id === viewwayConfig.projectId) || projects[0];
+    return (
+      <EmbedViewway
+        project={targetProject}
+        onOpenFullViewway={(id) => {
+          setViewwayConfig({ mode: 'share', projectId: id });
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', `/?share=${id}`);
+          }
+        }}
+      />
+    );
+  }
+
+  // 2. Direct Public Share / Review Viewway Mode (?share=proj-1 or ?review=proj-1)
+  if ((viewwayConfig.mode === 'share' || viewwayConfig.mode === 'review') && viewwayConfig.projectId) {
+    const targetProject = projects.find((p) => p.id === viewwayConfig.projectId) || projects[0];
+    return (
+      <PublicShareViewway
+        project={targetProject}
+        initialTab={viewwayConfig.mode === 'review' ? 'review' : 'viewer'}
+        onBackToApp={() => {
+          setViewwayConfig({ mode: null, projectId: null });
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', '/');
+          }
+        }}
+        onOpenInEditor={(id) => {
+          setViewwayConfig({ mode: null, projectId: null });
+          setActiveProjectId(id);
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', '/');
+          }
+        }}
+        onUpdateProject={handleUpdateProject}
+      />
+    );
+  }
+
+  // 3. If not logged in, show exact replica of web.descript.com/authenticate
   if (!isAuthenticated) {
     return <AuthView onLogin={() => setIsAuthenticated(true)} />;
   }
 
-  // If in editor mode
+  // 4. If in editor mode
   if (activeProject) {
     return (
       <EditorView
@@ -156,7 +219,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // Otherwise, show Drive / Projects Dashboard
+  // 5. Otherwise, show Drive / Projects Dashboard
   return (
     <DashboardView
       projects={projects}
@@ -166,6 +229,12 @@ export const App: React.FC = () => {
       onLogout={() => setIsAuthenticated(false)}
       onImportMedia={handleImportMedia}
       onSaveRecording={handleSaveRecording}
+      onOpenPublicViewway={(id) => {
+        setViewwayConfig({ mode: 'share', projectId: id });
+        if (typeof window !== 'undefined') {
+          window.history.pushState({}, '', `/?share=${id}`);
+        }
+      }}
     />
   );
 };

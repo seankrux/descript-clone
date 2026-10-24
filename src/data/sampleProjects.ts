@@ -125,6 +125,10 @@ export const SAMPLE_COMMENTS: CommentItem[] = [
     createdAt: '10 mins ago',
     text: 'Love the pacing here! Let\'s remove the filler word "um" before shipping to YouTube.',
     resolved: false,
+    reactions: [
+      { emoji: '🔥', count: 3, users: ['Alex Rivera', 'Elena Rostova', 'Marcus'] },
+      { emoji: '💡', count: 1, users: ['Alex Rivera'] },
+    ],
     replies: [
       {
         id: 'r-1',
@@ -141,7 +145,10 @@ export const SAMPLE_COMMENTS: CommentItem[] = [
     timecode: 11.2,
     createdAt: '1 hour ago',
     text: 'Studio Sound removes the air conditioner hum completely. The dynamic captions in neon style look awesome.',
-    resolved: true
+    resolved: true,
+    reactions: [
+      { emoji: '❤️', count: 4, users: ['Sarah Chen', 'Alex Rivera', 'Liam', 'Zoe'] }
+    ]
   }
 ];
 
@@ -317,6 +324,23 @@ export const SAMPLE_PROJECTS: Project[] = [
     tracks: INITIAL_TRACKS,
     multicamAngles: SAMPLE_MULTICAM_ANGLES,
     comments: SAMPLE_COMMENTS,
+    shareSettings: {
+      isPublished: true,
+      accessLevel: 'public',
+      allowComments: true,
+      allowDownloads: true,
+      allowTranscriptSearch: true,
+      showWatermark: false,
+      publishedAt: '2 hours ago',
+      viewCount: 1420,
+      embedConfig: {
+        theme: 'dark',
+        autoplay: false,
+        loop: false,
+        showTranscript: true,
+        accentColor: '#6366f1'
+      }
+    },
     scenes: [
       {
         id: 'scene-1',
@@ -371,6 +395,23 @@ export const SAMPLE_PROJECTS: Project[] = [
     tracks: INITIAL_TRACKS.slice(0, 2),
     multicamAngles: [],
     comments: [],
+    shareSettings: {
+      isPublished: true,
+      accessLevel: 'unlisted',
+      allowComments: true,
+      allowDownloads: true,
+      allowTranscriptSearch: true,
+      showWatermark: false,
+      publishedAt: 'Yesterday',
+      viewCount: 620,
+      embedConfig: {
+        theme: 'dark',
+        autoplay: false,
+        loop: false,
+        showTranscript: true,
+        accentColor: '#10b981'
+      }
+    },
     scenes: [
       {
         id: 'scene-2',
@@ -424,6 +465,23 @@ export const SAMPLE_PROJECTS: Project[] = [
     tracks: INITIAL_TRACKS,
     multicamAngles: SAMPLE_MULTICAM_ANGLES.slice(0, 2),
     comments: [],
+    shareSettings: {
+      isPublished: true,
+      accessLevel: 'public',
+      allowComments: true,
+      allowDownloads: false,
+      allowTranscriptSearch: true,
+      showWatermark: false,
+      publishedAt: '3 days ago',
+      viewCount: 4890,
+      embedConfig: {
+        theme: 'dark',
+        autoplay: true,
+        loop: true,
+        showTranscript: false,
+        accentColor: '#06b6d4'
+      }
+    },
     scenes: [
       {
         id: 'scene-3',

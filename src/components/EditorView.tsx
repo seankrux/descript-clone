@@ -42,7 +42,8 @@ import {
   CaptionConfig, 
   TimelineTrack, 
   MulticamAngle, 
-  CommentItem 
+  CommentItem,
+  ShareSettings
 } from '../types';
 
 import { UnderlordPanel } from './UnderlordPanel';
@@ -57,6 +58,7 @@ import { ScreenRecorderModal } from './ScreenRecorderModal';
 import { CommentsPanel } from './CommentsPanel';
 import { EnterpriseExportModal } from './EnterpriseExportModal';
 import { CanvasTransitionsModal } from './CanvasTransitionsModal';
+import { ShareModal } from './ShareModal';
 import { ToastContainer, ToastMessage } from './Toast';
 import { StudioAudioEngine } from '../utils/audioDsp';
 
@@ -114,6 +116,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isTransitionsOpen, setIsTransitionsOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Project features state
   const [studioSound, setStudioSound] = useState<StudioSoundConfig>(
@@ -704,10 +707,21 @@ export const EditorView: React.FC<EditorViewProps> = ({
           {/* Export Studio button */}
           <button
             onClick={() => setIsExportOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+            title="Export 4K Master, NLE XML, or Stems"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export 4K</span>
+          </button>
+
+          {/* Share & Publish Viewways button */}
+          <button
+            onClick={() => setIsShareModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+            title="Publish interactive viewway, generate embed code, or invite reviewers"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share</span>
           </button>
         </div>
       </header>
@@ -1073,6 +1087,28 @@ export const EditorView: React.FC<EditorViewProps> = ({
           setStudioLightingEnabled(!studioLightingEnabled);
           addToast('info', 'Studio Lighting', !studioLightingEnabled ? 'Virtual key light enabled' : 'Studio lighting disabled');
         }}
+      />
+
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        project={{
+          ...project,
+          comments,
+          tracks,
+          multicamAngles,
+          scenes: [{ ...project.scenes[0], words }],
+        }}
+        onUpdateShareSettings={(newSettings) => {
+          const updated: Project = { ...project, shareSettings: newSettings, comments, tracks, multicamAngles };
+          onUpdateProject(updated);
+          addToast('success', 'Share Permissions Updated', 'New access settings have been saved.');
+        }}
+        onOpenPublicViewway={() => {
+          setIsShareModalOpen(false);
+          window.open(`/?share=${project.id}`, '_blank');
+        }}
+        onAddToast={(type, title, desc) => addToast(type, title, desc)}
       />
     </div>
   );

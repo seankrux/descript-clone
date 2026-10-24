@@ -102,6 +102,12 @@ export interface MulticamAngle {
   isPrimary?: boolean;
 }
 
+export interface CommentReaction {
+  emoji: string;
+  count: number;
+  users: string[];
+}
+
 export interface CommentItem {
   id: string;
   author: string;
@@ -110,12 +116,37 @@ export interface CommentItem {
   createdAt: string;
   text: string;
   resolved: boolean;
+  reactions?: CommentReaction[];
   replies?: {
     id: string;
     author: string;
     text: string;
     createdAt: string;
   }[];
+}
+
+export type ShareAccessLevel = 'public' | 'unlisted' | 'passcode';
+
+export interface EmbedConfig {
+  theme: 'dark' | 'light';
+  autoplay: boolean;
+  loop: boolean;
+  showTranscript: boolean;
+  accentColor: string;
+}
+
+export interface ShareSettings {
+  isPublished: boolean;
+  accessLevel: ShareAccessLevel;
+  passcode?: string;
+  allowComments: boolean;
+  allowDownloads: boolean;
+  allowTranscriptSearch: boolean;
+  showWatermark: boolean;
+  customSlug?: string;
+  publishedAt?: string;
+  viewCount: number;
+  embedConfig: EmbedConfig;
 }
 
 export interface TeleprompterConfig {
@@ -154,6 +185,7 @@ export interface Project {
   tracks?: TimelineTrack[];
   multicamAngles?: MulticamAngle[];
   comments?: CommentItem[];
+  shareSettings?: ShareSettings;
 }
 
 export interface UnderlordFeature {

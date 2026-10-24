@@ -21,7 +21,11 @@ import {
   Puzzle,
   ExternalLink,
   CheckCircle2,
-  Camera
+  Camera,
+  Share2,
+  Globe,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Project } from '../types';
 import { ScreenRecorderModal } from './ScreenRecorderModal';
@@ -34,6 +38,7 @@ interface DashboardViewProps {
   onLogout: () => void;
   onImportMedia?: (file: File) => void;
   onSaveRecording?: (videoUrl: string, title: string) => void;
+  onOpenPublicViewway?: (projectId: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -44,12 +49,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onLogout,
   onImportMedia,
   onSaveRecording,
+  onOpenPublicViewway,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState<'video' | 'audio'>('video');
 
@@ -282,6 +289,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="px-2 py-0.5 rounded-md bg-indigo-500/30 backdrop-blur-md text-[10px] font-semibold text-indigo-200 border border-indigo-500/30">
                       {project.resolution}
                     </span>
+                    {project.shareSettings?.isPublished && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 backdrop-blur-md text-[10px] font-semibold text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                        <Globe className="w-2.5 h-2.5" />
+                        Viewway
+                      </span>
+                    )}
                   </div>
 
                   <span className="absolute bottom-2.5 right-2.5 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-md text-[10px] font-mono text-slate-300">
@@ -303,19 +316,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between text-xs text-slate-400">
-                    <span className="text-[11px] text-indigo-400 group-hover:underline">
+                    <span className="text-[11px] text-indigo-400 group-hover:underline font-medium">
                       Open in Editor →
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteProject(project.id);
-                      }}
-                      className="p-1 hover:text-red-400 rounded transition-colors cursor-pointer"
-                      title="Delete Project"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = `${window.location.origin}/?share=${project.id}`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedId(project.id);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        className="p-1.5 hover:text-white rounded-lg bg-white/[0.04] hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Copy Public Presentation Link"
+                      >
+                        {copiedId === project.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Share2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenPublicViewway) {
+                            onOpenPublicViewway(project.id);
+                          } else {
+                            window.open(`/?share=${project.id}`, '_blank');
+                          }
+                        }}
+                        className="p-1.5 hover:text-white rounded-lg bg-white/[0.04] hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Open Public Viewway in Window"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteProject(project.id);
+                        }}
+                        className="p-1.5 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                        title="Delete Project"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
