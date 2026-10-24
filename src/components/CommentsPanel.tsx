@@ -35,7 +35,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
   const [newText, setNewText] = useState('');
   const [filter, setFilter] = useState<'all' | 'unresolved'>('all');
 
-  useModalDismiss(isOpen, onClose);
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -70,11 +70,15 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="comments-panel-title"
-      className="fixed inset-y-0 right-0 w-full sm:w-[380px] max-w-full bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe"
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex justify-end"
     >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="comments-panel-title"
+        className="w-full sm:w-[380px] max-w-full h-full bg-[#121622] border-l border-white/[0.1] shadow-2xl flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe"
+      >
       {/* Header */}
       <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
         <div className="flex items-center gap-2.5">
@@ -236,6 +240,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
           </button>
         </div>
       </form>
+    </div>
     </div>
   );
 };

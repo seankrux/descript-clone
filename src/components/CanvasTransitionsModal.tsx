@@ -88,6 +88,10 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={backgroundRemovalEnabled}
+              aria-label="AI Green Screen / Background Blur"
               onClick={onToggleBackgroundRemoval}
               className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                 backgroundRemovalEnabled ? 'bg-amber-600' : 'bg-slate-700'
@@ -115,6 +119,10 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={studioLightingEnabled}
+              aria-label="AI Studio Ring Lighting"
               onClick={onToggleStudioLighting}
               className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                 studioLightingEnabled ? 'bg-amber-600' : 'bg-slate-700'

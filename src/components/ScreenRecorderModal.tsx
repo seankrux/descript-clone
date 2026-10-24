@@ -20,7 +20,7 @@ import { useModalDismiss } from '../utils/useModalDismiss';
 interface ScreenRecorderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSaveRecording: (videoUrl: string, title: string) => void;
+  onSaveRecording: (videoUrl: string, title: string, duration?: number, transcript?: string) => void;
 }
 
 export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
@@ -34,11 +34,14 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordedBlobUrl, setRecordedBlobUrl] = useState<string | null>(null);
   const [micEnabled, setMicEnabled] = useState(true);
+  const [liveTranscript, setLiveTranscript] = useState<string>('');
 
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const camVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -53,6 +56,16 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
     return () => clearInterval(timerRef.current);
   }, [isRecording, isPaused]);
 
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      camStreamRef.current?.getTracks().forEach((t) => t.stop());
+      try {
+        recognitionRef.current?.stop();
+      } catch {}
+    };
+  }, []);
+
   const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
 
   if (!isOpen) return null;
@@ -60,6 +73,7 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
   const startRecording = async () => {
     try {
       chunksRef.current = [];
+      setLiveTranscript('');
       let combinedStream: MediaStream;
 
       if (recordMode === 'camera') {
@@ -81,6 +95,22 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
             console.warn('Microphone permission skipped');
           }
         }
+
+        if (recordMode === 'both') {
+          try {
+            const camStream = await navigator.mediaDevices.getUserMedia({
+              video: { width: 320, height: 320, facingMode: 'user' },
+              audio: false,
+            });
+            camStreamRef.current = camStream;
+            if (camVideoRef.current) {
+              camVideoRef.current.srcObject = camStream;
+            }
+          } catch (camErr) {
+            console.warn('Webcam bubble stream unavailable:', camErr);
+          }
+        }
+
         combinedStream = displayStream;
       }
 
@@ -88,6 +118,30 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
 
       if (screenVideoRef.current) {
         screenVideoRef.current.srcObject = combinedStream;
+      }
+
+      // Optional live Web Speech API transcription during recording
+      if (typeof window !== 'undefined' && micEnabled) {
+        const SpeechRecognitionCtor =
+          (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (SpeechRecognitionCtor) {
+          try {
+            const recognition = new SpeechRecognitionCtor();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.onresult = (event: any) => {
+              let transcriptText = '';
+              for (let i = 0; i < event.results.length; i++) {
+                transcriptText += event.results[i][0].transcript + ' ';
+              }
+              if (transcriptText.trim()) {
+                setLiveTranscript(transcriptText.trim());
+              }
+            };
+            recognition.start();
+            recognitionRef.current = recognition;
+          } catch {}
+        }
       }
 
       const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
@@ -122,13 +176,19 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
   };
 
   const stopRecording = () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
+    camStreamRef.current?.getTracks().forEach((t) => t.stop());
+    camStreamRef.current = null;
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
     } else {
       // Simulation stop
       setIsRecording(false);
-      setRecordedBlobUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+      setRecordedBlobUrl('/sample-studio.mp4');
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.5 } });
     }
   };
@@ -141,7 +201,13 @@ export const ScreenRecorderModal: React.FC<ScreenRecorderModalProps> = ({
 
   const handleFinish = () => {
     if (recordedBlobUrl) {
-      onSaveRecording(recordedBlobUrl, `Screen Recording ${new Date().toLocaleTimeString()}`);
+      const finalDuration = recordingDuration > 0 ? recordingDuration : 18.0;
+      onSaveRecording(
+        recordedBlobUrl,
+        `Screen Recording ${new Date().toLocaleTimeString()}`,
+        finalDuration,
+        liveTranscript.trim() || undefined
+      );
       onClose();
     }
   };

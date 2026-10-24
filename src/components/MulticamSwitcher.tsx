@@ -82,6 +82,10 @@ export const MulticamSwitcher: React.FC<MulticamSwitcherProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={isAutoSpeakerCut}
+              aria-label="AI Auto-Speaker Angle Switching"
               onClick={onToggleAutoSpeakerCut}
               className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                 isAutoSpeakerCut ? 'bg-blue-600' : 'bg-slate-700'

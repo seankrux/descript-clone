@@ -264,6 +264,21 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     );
                   })}
                 </div>
+                {settings.accessLevel === 'passcode' && (
+                  <div className="pt-2 flex items-center gap-3">
+                    <label htmlFor="share-passcode-input" className="text-xs font-medium text-slate-300 shrink-0">
+                      Viewer Passcode:
+                    </label>
+                    <input
+                      id="share-passcode-input"
+                      type="text"
+                      value={settings.passcode || 'studio2026'}
+                      onChange={(e) => updateSettingsField('passcode', e.target.value)}
+                      placeholder="Enter required passcode..."
+                      className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Granular Permission Toggles */}

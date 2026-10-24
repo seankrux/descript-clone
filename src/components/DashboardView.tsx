@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Project } from '../types';
 import { ScreenRecorderModal } from './ScreenRecorderModal';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -37,7 +38,7 @@ interface DashboardViewProps {
   onDeleteProject: (projectId: string) => void;
   onLogout: () => void;
   onImportMedia?: (file: File) => void;
-  onSaveRecording?: (videoUrl: string, title: string) => void;
+  onSaveRecording?: (videoUrl: string, title: string, duration?: number, transcript?: string) => void;
   onOpenPublicViewway?: (projectId: string) => void;
   onResetToDemo?: () => void;
 }
@@ -54,7 +55,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onResetToDemo,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio' | 'shared'>('all');
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
@@ -66,9 +67,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  useModalDismiss(isNewProjectModalOpen, () => setIsNewProjectModalOpen(false));
+  const { handleBackdropClick: handleExtensionBackdrop } = useModalDismiss(
+    isExtensionModalOpen,
+    () => setIsExtensionModalOpen(false)
+  );
+  const { handleBackdropClick: handleProfileBackdrop } = useModalDismiss(
+    isProfileModalOpen,
+    () => setIsProfileModalOpen(false)
+  );
+
   const filteredProjects = projects.filter((p) => {
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'all' || p.type === filterType;
+    const matchesType =
+      filterType === 'all'
+        ? true
+        : filterType === 'shared'
+        ? Boolean(p.shareSettings?.isPublished)
+        : p.type === filterType;
     return matchesSearch && matchesType;
   });
 
@@ -119,21 +135,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Navigation Links */}
           <nav className="p-3 space-y-1 text-xs">
-            <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-indigo-600/15 text-indigo-300 font-medium border border-indigo-500/20">
+            <button
+              onClick={() => {
+                setFilterType('all');
+                setActiveMobileTab('projects');
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                filterType !== 'shared'
+                  ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              }`}
+            >
               <Clock className="w-4 h-4 text-indigo-400" />
               <span>Recent Projects</span>
             </button>
-            <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors">
+            <button
+              onClick={() => {
+                setFilterType('all');
+                setSearchQuery('');
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
+            >
               <Folder className="w-4 h-4 text-slate-400" />
               <span>All Files</span>
             </button>
-            <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors">
+            <button
+              onClick={() => {
+                setFilterType('shared');
+                setActiveMobileTab('shared');
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                filterType === 'shared'
+                  ? 'bg-indigo-600/15 text-indigo-300 font-medium border border-indigo-500/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+              }`}
+            >
               <Users className="w-4 h-4 text-slate-400" />
               <span>Shared with me</span>
             </button>
             <button
               onClick={() => setIsExtensionModalOpen(true)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-indigo-300 bg-indigo-950/30 hover:bg-indigo-950/60 border border-indigo-500/20 transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-indigo-300 bg-indigo-950/30 hover:bg-indigo-950/60 border border-indigo-500/20 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
                 <Puzzle className="w-4 h-4 text-indigo-400" />
@@ -500,10 +542,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <ScreenRecorderModal
           isOpen={isRecorderOpen}
           onClose={() => setIsRecorderOpen(false)}
-          onSaveRecording={(url, title) => {
+          onSaveRecording={(url, title, duration, transcript) => {
             setIsRecorderOpen(false);
             if (onSaveRecording) {
-              onSaveRecording(url, title);
+              onSaveRecording(url, title, duration, transcript);
             }
           }}
         />
@@ -511,20 +553,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Chrome Extension Companion Info Modal */}
       {isExtensionModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+        <div
+          onClick={handleExtensionBackdrop}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="extension-modal-title"
+            className="w-full max-w-lg bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white">
                   <Puzzle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">Descriptivist Companion Extension</h3>
+                  <h3 id="extension-modal-title" className="font-bold text-sm text-white">Descriptivist Companion Extension</h3>
                   <span className="text-[10px] text-indigo-300 font-mono">Manifest V3 Chrome Extension</span>
                 </div>
               </div>
               <button
                 onClick={() => setIsExtensionModalOpen(false)}
+                aria-label="Close Chrome Extension Modal"
                 className="p-1 rounded-lg text-slate-400 hover:text-white"
               >
                 ✕
@@ -577,20 +628,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Mobile Profile & Workspace Sheet */}
       {isProfileModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="w-full sm:max-w-md bg-[#141824] border border-white/[0.1] rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-safe">
+        <div
+          onClick={handleProfileBackdrop}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-modal-title"
+            className="w-full sm:max-w-md bg-[#141824] border border-white/[0.1] rounded-t-3xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-safe"
+          >
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-indigo-400/40 flex items-center justify-center font-bold text-sm text-white shadow-md">
                   SG
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Sean G</h3>
+                  <h3 id="profile-modal-title" className="text-sm font-bold text-white">Sean G</h3>
                   <p className="text-[11px] text-slate-400">seanguillermo@gmail.com</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsProfileModalOpen(false)}
+                aria-label="Close Profile Modal"
                 className="p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
                 ✕
@@ -670,10 +730,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             onClick={() => {
               setActiveMobileTab('shared');
-              const sharedOnly = projects.filter((p) => p.shareSettings?.isPublished);
-              if (sharedOnly.length > 0) {
-                setSearchQuery('');
-              }
+              setFilterType('shared');
+              setSearchQuery('');
             }}
             className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 transition-transform active:scale-90 ${
               activeMobileTab === 'shared' ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-200'

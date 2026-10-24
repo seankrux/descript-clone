@@ -25,7 +25,8 @@ import {
   generateJSONTimestamps, 
   generatePremiereXML, 
   generateFCPXML, 
-  generateEDL 
+  generateEDL,
+  generateTrimmedWavBlob
 } from '../utils/exportGenerators';
 
 const YouTubeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -71,17 +72,20 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
 
   if (!isOpen) return null;
 
+  const activeWordCount = words.filter((w) => !w.deleted).length;
+  const cutWordCount = words.filter((w) => w.deleted).length;
+
   const handleStartRender = () => {
     setIsRendering(true);
     setIsRenderComplete(false);
     setRenderProgress(5);
-    setRenderStage('Extracting audio & speech tokens...');
+    setRenderStage(`Extracting ${activeWordCount} active speech tokens (${cutWordCount} cuts omitted)...`);
 
     const stages = [
       { at: 20, stage: 'Applying Studio Sound neural remaster (-14 LUFS)...' },
       { at: 45, stage: 'Rendering dynamic karaoke captions...' },
-      { at: 70, stage: 'Multiplexing 4K video frames & audio streams...' },
-      { at: 90, stage: 'Finalizing container encoding (ProRes / MP4)...' },
+      { at: 70, stage: 'Multiplexing edited media segments & audio streams...' },
+      { at: 90, stage: 'Finalizing container encoding (ProRes / MP4 / WAV)...' },
       { at: 100, stage: 'Export Complete!' }
     ];
 
@@ -104,11 +108,33 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
           onNotify('Render Complete!', `${project.title} exported as ${settings.format.toUpperCase()} (${settings.resolution})`);
         }
       }
-    }, 400);
+    }, 350);
+  };
+
+  const handleDownloadTrimmedWav = () => {
+    const wavBlob = generateTrimmedWavBlob(words, project.silenceSkipRanges);
+    const url = URL.createObjectURL(wavBlob.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.title.toLowerCase().replace(/\s+/g, '-')}-edited-master.wav`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (onNotify) {
+      onNotify(
+        'Edited WAV Master Downloaded',
+        `Synthesized ${activeWordCount} active words (${cutWordCount} deleted words omitted).`
+      );
+    }
   };
 
   const handleDownloadRenderedMedia = () => {
-    const videoUrl = project.scenes[0]?.videoClipUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    if (settings.format === 'wav' || settings.resolution === 'audio_only') {
+      handleDownloadTrimmedWav();
+      return;
+    }
+    const videoUrl = project.scenes[0]?.videoClipUrl || '/sample-studio.mp4';
     const a = document.createElement('a');
     a.href = videoUrl;
     a.download = `${project.title.toLowerCase().replace(/\s+/g, '-')}.${settings.format}`;
@@ -117,7 +143,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
     a.click();
     document.body.removeChild(a);
     if (onNotify) {
-      onNotify('Download Started', `Saving ${settings.format.toUpperCase()} to your device.`);
+      onNotify('Download Started', `Saving ${settings.format.toUpperCase()} (${activeWordCount} active tokens) to your device.`);
     }
   };
 
@@ -136,12 +162,14 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
     setTimeout(() => setDownloadSuccessItem(null), 2500);
 
     if (onNotify) {
-      onNotify(`Exported ${title}`, `Saved ${ext} with ${words.filter(w => !w.deleted).length} synchronized tokens.`);
+      onNotify(`Exported ${title}`, `Saved ${ext} with ${activeWordCount} synchronized tokens.`);
     }
   };
 
+  const shareOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://descript-clone-lemon.vercel.app';
+  const shareUrl = `${shareOrigin}/?share=${project.id}`;
+
   const handleCopyLink = () => {
-    const shareUrl = `https://web.descript.com/share/${project.title.toLowerCase().replace(/\s+/g, '-')}-4k`;
     navigator.clipboard?.writeText(shareUrl);
     setShareLinkCopied(true);
     setTimeout(() => setShareLinkCopied(false), 2000);
@@ -303,13 +331,21 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>Production Master Ready!</span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleDownloadRenderedMedia}
-                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download {settings.format.toUpperCase()} Master</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadTrimmedWav}
+                      className="py-2.5 px-3 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Download synthesized RIFF WAVE audio reflecting only non-deleted script words"
+                    >
+                      <FileAudio className="w-3.5 h-3.5" />
+                      <span>Trimmed WAV ({activeWordCount} words)</span>
                     </button>
                     <button
                       onClick={handleStartRender}
@@ -450,7 +486,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value={`https://descript-clone-lemon.vercel.app/?share=${project.id}`}
+                    value={shareUrl}
                     className="flex-1 px-3 py-2 rounded-lg bg-black/60 border border-white/10 text-xs font-mono text-slate-300"
                   />
                   <button

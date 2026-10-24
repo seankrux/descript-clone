@@ -22,6 +22,12 @@ export interface Scene {
   videoClipUrl: string;
   thumbnailUrl?: string;
   activeAngleId?: string;
+  silenceSkipRanges?: Array<{ start: number; end: number }>;
+}
+
+export interface SilenceSkipRange {
+  start: number;
+  end: number;
 }
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
@@ -186,6 +192,8 @@ export interface Project {
   multicamAngles?: MulticamAngle[];
   comments?: CommentItem[];
   shareSettings?: ShareSettings;
+  silenceSkipRanges?: SilenceSkipRange[];
+  savedSilenceSeconds?: number;
 }
 
 export interface UnderlordFeature {

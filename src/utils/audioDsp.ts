@@ -17,16 +17,24 @@ export class StudioAudioEngine {
   private wetGain: GainNode | null = null;
   private dryGain: GainNode | null = null;
   private masterGain: GainNode | null = null;
+  private analyser: AnalyserNode | null = null;
+  private currentElement: HTMLMediaElement | null = null;
   private isInitialized = false;
 
   public init(mediaElement: HTMLMediaElement): boolean {
-    if (this.isInitialized) return true;
+    if (this.isInitialized && this.currentElement === mediaElement) return true;
 
     try {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtxClass) return false;
 
+      // Ensure media element allows cross-origin reading without tainting
+      if (mediaElement && !mediaElement.crossOrigin) {
+        mediaElement.crossOrigin = 'anonymous';
+      }
+
       this.audioCtx = new AudioCtxClass();
+      this.currentElement = mediaElement;
 
       // Create nodes
       this.sourceNode = this.audioCtx.createMediaElementSource(mediaElement);
@@ -36,11 +44,12 @@ export class StudioAudioEngine {
       this.highpassFilter.type = 'highpass';
       this.highpassFilter.frequency.value = 80;
 
-      // 2. Notch filter for 60Hz hum suppression
+      // 2. Peaking filter for 60Hz hum suppression with precise dB attenuation
       this.humNotchFilter = this.audioCtx.createBiquadFilter();
-      this.humNotchFilter.type = 'notch';
+      this.humNotchFilter.type = 'peaking';
       this.humNotchFilter.frequency.value = 60;
-      this.humNotchFilter.Q.value = 10;
+      this.humNotchFilter.Q.value = 6.0;
+      this.humNotchFilter.gain.value = -32;
 
       // 3. Presence filter (boost speech intelligibility around 3.2kHz)
       this.presenceFilter = this.audioCtx.createBiquadFilter();
@@ -69,6 +78,11 @@ export class StudioAudioEngine {
       this.dryGain = this.audioCtx.createGain();
       this.masterGain = this.audioCtx.createGain();
 
+      // Real-time FFT AnalyserNode
+      this.analyser = this.audioCtx.createAnalyser();
+      this.analyser.fftSize = 128;
+      this.analyser.smoothingTimeConstant = 0.78;
+
       // Connect Wet Chain:
       // Source -> Highpass -> Hum Notch -> Presence -> DeReverb -> Compressor -> WetGain -> Master
       this.sourceNode.connect(this.highpassFilter);
@@ -84,8 +98,9 @@ export class StudioAudioEngine {
       this.sourceNode.connect(this.dryGain);
       this.dryGain.connect(this.masterGain);
 
-      // Master -> Output Destination
-      this.masterGain.connect(this.audioCtx.destination);
+      // Master -> Analyser -> Output Destination
+      this.masterGain.connect(this.analyser);
+      this.analyser.connect(this.audioCtx.destination);
 
       this.isInitialized = true;
       return true;
@@ -117,7 +132,8 @@ export class StudioAudioEngine {
     }
 
     if (this.humNotchFilter) {
-      this.humNotchFilter.gain.value = config.humRemoval ? -24 : 0;
+      const humGain = config.humRemoval ? -32 : 0;
+      this.humNotchFilter.gain.setValueAtTime(humGain, this.audioCtx.currentTime);
     }
 
     if (this.deReverbFilter) {
@@ -127,6 +143,14 @@ export class StudioAudioEngine {
     if (this.compressor) {
       this.compressor.threshold.value = config.loudnessNorm ? -22 : -12;
     }
+  }
+
+  public getFrequencyData(targetArray: Uint8Array): boolean {
+    if (!this.analyser || !this.isInitialized || !this.audioCtx || this.audioCtx.state !== 'running') {
+      return false;
+    }
+    this.analyser.getByteFrequencyData(targetArray as Uint8Array<ArrayBuffer>);
+    return targetArray.some((v) => v > 0);
   }
 
   public resumeContext() {
@@ -139,6 +163,8 @@ export class StudioAudioEngine {
     if (this.audioCtx) {
       this.audioCtx.close().catch(() => {});
       this.audioCtx = null;
+      this.analyser = null;
+      this.currentElement = null;
       this.isInitialized = false;
     }
   }

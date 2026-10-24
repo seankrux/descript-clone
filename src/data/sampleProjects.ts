@@ -94,7 +94,7 @@ export const SAMPLE_MULTICAM_ANGLES: MulticamAngle[] = [
     id: 'angle-1',
     name: 'Camera A (Host - Sean)',
     speaker: 'Sean',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    videoUrl: '/sample-studio.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     isPrimary: true
   },
@@ -102,7 +102,7 @@ export const SAMPLE_MULTICAM_ANGLES: MulticamAngle[] = [
     id: 'angle-2',
     name: 'Camera B (Guest - Sarah)',
     speaker: 'Sarah',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    videoUrl: '/sample-studio.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80',
     isPrimary: false
   },
@@ -110,7 +110,7 @@ export const SAMPLE_MULTICAM_ANGLES: MulticamAngle[] = [
     id: 'angle-3',
     name: 'Screen Share / Canvas Demo',
     speaker: 'Screen',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    videoUrl: '/sample-studio.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80',
     isPrimary: false
   }
@@ -348,7 +348,7 @@ export const SAMPLE_PROJECTS: Project[] = [
         startTime: 0,
         endTime: 21.6,
         words: INITIAL_WORDS,
-        videoClipUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        videoClipUrl: '/sample-studio.mp4',
         thumbnailUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
         activeAngleId: 'angle-1'
       }
@@ -489,7 +489,7 @@ export const SAMPLE_PROJECTS: Project[] = [
         startTime: 0,
         endTime: 16.5,
         words: INITIAL_WORDS.slice(0, 20),
-        videoClipUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        videoClipUrl: '/sample-studio.mp4',
         thumbnailUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=600&q=80',
         activeAngleId: 'angle-1'
       }

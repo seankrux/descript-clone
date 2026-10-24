@@ -74,6 +74,10 @@ export const EyeContactModal: React.FC<EyeContactModalProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={config.enabled}
+              aria-label="Auto-Correct Gaze"
               onClick={() => onChange({ ...config, enabled: !config.enabled })}
               className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                 config.enabled ? 'bg-cyan-600' : 'bg-slate-700'
@@ -137,9 +141,14 @@ export const EyeContactModal: React.FC<EyeContactModalProps> = ({
             </div>
 
             {/* Natural Saccades Toggle */}
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-checked={config.naturalSaccades}
+              aria-label="Natural Eye Drift and Blinking"
+              disabled={!config.enabled}
               onClick={() => config.enabled && onChange({ ...config, naturalSaccades: !config.naturalSaccades })}
-              className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+              className={`w-full p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors text-left ${
                 config.naturalSaccades && config.enabled
                   ? 'bg-cyan-950/30 border-cyan-500/40 text-white'
                   : 'bg-white/[0.02] border-white/[0.06] text-slate-400 opacity-60'
@@ -153,7 +162,7 @@ export const EyeContactModal: React.FC<EyeContactModalProps> = ({
                 </div>
               </div>
               {config.naturalSaccades && config.enabled && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-            </div>
+            </button>
           </div>
         </div>
 

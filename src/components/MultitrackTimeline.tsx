@@ -142,12 +142,15 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
       <div className="flex-1 flex overflow-hidden">
         {/* Track Headers (Left column) */}
         <div className="w-32 sm:w-56 border-r border-white/[0.08] bg-[#121622]/95 flex flex-col shrink-0 overflow-y-auto">
+          <div className="h-6 shrink-0 border-b border-white/[0.06] bg-black/40 px-3 flex items-center text-[10px] font-mono text-slate-500">
+            Tracks
+          </div>
           {tracks.map((track) => {
             const Icon = getTrackIcon(track.type);
             return (
               <div
                 key={track.id}
-                className="h-10 px-3 border-b border-white/[0.04] flex items-center justify-between group hover:bg-white/[0.02]"
+                className="h-10 shrink-0 px-3 border-b border-white/[0.04] flex items-center justify-between group hover:bg-white/[0.02]"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -192,7 +195,7 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
             style={{ width: trackCanvasWidthPct, minWidth: '100%' }}
           >
             {/* Timecode Ruler on top */}
-            <div className="h-6 border-b border-white/[0.06] bg-black/40 flex items-center text-[10px] font-mono text-slate-500 relative">
+            <div className="h-6 shrink-0 border-b border-white/[0.06] bg-black/40 flex items-center text-[10px] font-mono text-slate-500 relative">
               {Array.from({ length: Math.ceil(duration / 2) + 1 }).map((_, i) => (
                 <div
                   key={i}
@@ -205,11 +208,11 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
             </div>
 
             {/* Track Rows */}
-            <div className="flex-1 flex flex-col relative">
+            <div className="flex-1 flex flex-col relative overflow-y-auto">
               {tracks.map((track) => (
                 <div
                   key={track.id}
-                  className="h-10 border-b border-white/[0.04] relative flex items-center px-1"
+                  className="h-10 shrink-0 border-b border-white/[0.04] relative flex items-center px-1"
                 >
                   {/* If Script track, render word boundaries along the timeline */}
                   {track.type === 'script' ? (

@@ -228,13 +228,16 @@
     document.body.appendChild(modalEl);
 
     document.getElementById('descript-close-modal').addEventListener('click', () => {
+      try {
+        URL.revokeObjectURL(videoUrl);
+      } catch {}
       modalEl.remove();
     });
 
     document.getElementById('descript-open-studio-btn').addEventListener('click', () => {
       const title = `Extension Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       
-      // 1. Broadcast to any open Descript tabs
+      // 1. Broadcast to open Descript tabs and pass raw Blob (avoiding cross-origin blob: URL)
       try {
         if ('BroadcastChannel' in window) {
           const channel = new BroadcastChannel('descript_companion_sync');
@@ -242,12 +245,17 @@
             type: 'RECORDING_COMPLETED',
             payload: {
               title,
-              videoUrl,
+              videoUrl: '',
+              videoBlob: blob,
+              mimeType: 'video/webm',
               duration: elapsedSeconds || 15,
               timestamp: Date.now(),
               mode: currentConfig ? currentConfig.mode : 'screen-cam',
             },
           });
+          setTimeout(() => {
+            try { channel.close(); } catch {}
+          }, 500);
         }
       } catch (e) {
         console.warn('Broadcast sync error:', e);
@@ -261,21 +269,28 @@
 
       const openedWin = window.open(targetUrl.toString(), '_blank');
       
-      // 3. PostMessage once opened
+      // 3. PostMessage raw Blob once opened so Studio creates its own origin ObjectURL
       if (openedWin) {
         setTimeout(() => {
-          openedWin.postMessage(
-            {
-              type: 'DESCRIPT_EXTENSION_RECORDING',
-              payload: {
-                title,
-                videoUrl,
-                duration: elapsedSeconds || 15,
-                timestamp: Date.now(),
+          try {
+            openedWin.postMessage(
+              {
+                type: 'DESCRIPT_EXTENSION_RECORDING',
+                payload: {
+                  title,
+                  videoUrl: '',
+                  videoBlob: blob,
+                  mimeType: 'video/webm',
+                  duration: elapsedSeconds || 15,
+                  timestamp: Date.now(),
+                  mode: currentConfig ? currentConfig.mode : 'screen-cam',
+                },
               },
-            },
-            '*'
-          );
+              targetUrl.origin
+            );
+          } catch (postErr) {
+            console.warn('postMessage to studio tab failed:', postErr);
+          }
         }, 1200);
       }
 

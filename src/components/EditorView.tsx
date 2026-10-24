@@ -44,7 +44,8 @@ import {
   TimelineTrack, 
   MulticamAngle, 
   CommentItem,
-  ShareSettings
+  ShareSettings,
+  SilenceSkipRange
 } from '../types';
 
 import { UnderlordPanel } from './UnderlordPanel';
@@ -62,6 +63,7 @@ import { CanvasTransitionsModal } from './CanvasTransitionsModal';
 import { ShareModal } from './ShareModal';
 import { ToastContainer, ToastMessage } from './Toast';
 import { StudioAudioEngine } from '../utils/audioDsp';
+import { computeNonDestructiveSkipTarget } from '../utils/exportGenerators';
 
 interface EditorViewProps {
   project: Project;
@@ -177,6 +179,9 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const [words, setWords] = useState<WordToken[]>(
     project.scenes[0]?.words || []
   );
+  const [silenceSkipRanges, setSilenceSkipRanges] = useState<SilenceSkipRange[]>(
+    project.silenceSkipRanges || project.scenes[0]?.silenceSkipRanges || []
+  );
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
   const [editingWordText, setEditingWordText] = useState('');
@@ -196,6 +201,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
         {
           ...project.scenes[0],
           words,
+          silenceSkipRanges,
         },
         ...project.scenes.slice(1),
       ],
@@ -205,9 +211,11 @@ export const EditorView: React.FC<EditorViewProps> = ({
       tracks,
       multicamAngles,
       comments,
+      silenceSkipRanges,
     });
   }, [
     words,
+    silenceSkipRanges,
     studioSound,
     eyeContact,
     captions,
@@ -253,28 +261,12 @@ export const EditorView: React.FC<EditorViewProps> = ({
       const cur = video.currentTime;
       setCurrentTime(cur);
 
-      // --- CRITICAL DESCRIPT FEATURE: Skip Deleted Words during Playback ---
-      if (isPlaying) {
-        const deletedWordAtCur = words.find(
-          (w) => w.deleted && cur >= w.start && cur < w.end
-        );
-
-        if (deletedWordAtCur) {
-          // Find next non-deleted word's start time
-          const nextActiveWord = words.find(
-            (w) => !w.deleted && w.start >= deletedWordAtCur.end
-          );
-
-          if (nextActiveWord) {
-            video.currentTime = nextActiveWord.start;
-            setCurrentTime(nextActiveWord.start);
-            return;
-          } else {
-            video.currentTime = deletedWordAtCur.end;
-            setCurrentTime(deletedWordAtCur.end);
-            return;
-          }
-        }
+      // --- CRITICAL DESCRIPT FEATURE: Skip Deleted Words & Shortened Silences during Playback ---
+      const skipTarget = computeNonDestructiveSkipTarget(cur, words, silenceSkipRanges);
+      if (skipTarget !== null && Math.abs(skipTarget - cur) > 0.03) {
+        video.currentTime = skipTarget;
+        setCurrentTime(skipTarget);
+        return;
       }
 
       // Auto-speaker multicam angle cut if enabled
@@ -304,7 +296,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [isPlaying, words, isAutoSpeakerCut, multicamAngles, activeAngleId]);
+  }, [isPlaying, words, silenceSkipRanges, isAutoSpeakerCut, multicamAngles, activeAngleId]);
 
   // Keyboard shortcut listener (Space, Backspace, Cmd+K, S)
   useEffect(() => {
@@ -355,8 +347,11 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const seekTo = (time: number) => {
     const video = videoRef.current;
     if (!video) return;
-    video.currentTime = Math.max(0, Math.min(time, duration));
-    setCurrentTime(video.currentTime);
+    const skipTarget = computeNonDestructiveSkipTarget(time, words, silenceSkipRanges);
+    const finalTime = skipTarget !== null ? skipTarget : time;
+    const boundedTime = Math.max(0, Math.min(finalTime, duration));
+    video.currentTime = boundedTime;
+    setCurrentTime(boundedTime);
   };
 
   const handleWordClick = (word: WordToken) => {
@@ -416,42 +411,34 @@ export const EditorView: React.FC<EditorViewProps> = ({
   };
 
   const shortenSilences = () => {
-    // Real silence shortening: detect gaps between consecutive words > 0.4s and compress to 0.15s
+    // Non-destructive silence shortening: detect gaps between consecutive non-deleted words > 0.4s
+    // Register skip ranges instead of mutating word timestamps!
+    const activeWords = words.filter((w) => !w.deleted);
+    const newSkipRanges: SilenceSkipRange[] = [];
     let savedTime = 0;
-    const sortedWords = [...words];
-    let cumulativeShift = 0;
 
-    for (let i = 0; i < sortedWords.length - 1; i++) {
-      const current = sortedWords[i];
-      const next = sortedWords[i + 1];
+    for (let i = 0; i < activeWords.length - 1; i++) {
+      const current = activeWords[i];
+      const next = activeWords[i + 1];
+      const rawGap = next.start - current.end;
 
-      // Shift current by cumulative
-      current.start = Number(Math.max(0, current.start - cumulativeShift).toFixed(2));
-      current.end = Number(Math.max(current.start + 0.1, current.end - cumulativeShift).toFixed(2));
-
-      const rawGap = next.start - (current.end + cumulativeShift);
       if (rawGap > 0.4) {
-        const reduction = rawGap - 0.15;
-        cumulativeShift += reduction;
-        savedTime += reduction;
+        const keepSilence = 0.15;
+        const skipStart = Number((current.end + keepSilence).toFixed(3));
+        const skipEnd = Number((next.start).toFixed(3));
+        if (skipEnd > skipStart) {
+          newSkipRanges.push({ start: skipStart, end: skipEnd });
+          savedTime += (skipEnd - skipStart);
+        }
       }
     }
 
-    if (sortedWords.length > 0) {
-      const last = sortedWords[sortedWords.length - 1];
-      last.start = Number(Math.max(0, last.start - cumulativeShift).toFixed(2));
-      last.end = Number(Math.max(last.start + 0.1, last.end - cumulativeShift).toFixed(2));
-    }
-
-    setWords(sortedWords);
-    const newDuration = Math.max(5, duration - savedTime);
-    setDuration(Number(newDuration.toFixed(1)));
-
+    setSilenceSkipRanges(newSkipRanges);
     confetti({ particleCount: 50, spread: 60 });
     addToast(
       'success',
       'Wordless Silences Shortened',
-      `Underlord trimmed ${savedTime.toFixed(1)}s of dead air across the project timeline.`
+      `Underlord registered ${newSkipRanges.length} non-destructive skip intervals (${savedTime.toFixed(1)}s dead air skipped).`
     );
   };
 
@@ -591,7 +578,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const videoSourceUrl =
     activeAngle?.videoUrl ||
     project.scenes[0]?.videoClipUrl ||
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    '/sample-studio.mp4';
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -607,34 +594,34 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
       {/* Top Header Bar with iOS Safe Area support */}
       <header className="pt-safe border-b border-white/[0.08] bg-[#121622] z-20 shrink-0">
-        <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3">
+        <div className="h-14 px-2 sm:px-3 xl:px-4 flex items-center justify-between gap-1.5 xl:gap-2 overflow-x-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink">
             <button
               onClick={onBack}
-              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
               title="Back to Projects"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
 
-            <div className="h-4 w-[1px] bg-white/10 hidden xs:block" />
+            <div className="h-4 w-[1px] bg-white/10 hidden xs:block shrink-0" />
 
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate max-w-[120px] xs:max-w-[180px] sm:max-w-xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate max-w-[110px] xs:max-w-[140px] lg:max-w-[130px] xl:max-w-[150px] 2xl:max-w-xs">
                 {project.title}
               </span>
-              <span className="hidden sm:inline-flex text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="hidden 2xl:inline-flex text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
                 Synced Cloud
               </span>
             </div>
           </div>
 
           {/* Center Suite Toolbar (Desktop Only) */}
-          <div className="hidden lg:flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/[0.08]">
+          <div className="hidden lg:flex items-center gap-0.5 bg-black/40 p-1 rounded-xl border border-white/[0.08] shrink-0">
             {/* Underlord AI button */}
             <button
               onClick={() => setIsUnderlordOpen(!isUnderlordOpen)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 cursor-pointer"
+              className="flex items-center gap-1.5 px-2 xl:px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 cursor-pointer shrink-0"
               title="Open Underlord Copilot (Cmd+K)"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -644,7 +631,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
             {/* Studio Sound button */}
             <button
               onClick={() => setIsStudioSoundOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2 xl:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
                 studioSound.enabled
                   ? 'bg-indigo-600/25 text-indigo-300 border border-indigo-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
@@ -658,7 +645,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
             {/* AI Eye Contact button */}
             <button
               onClick={() => setIsEyeContactOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2 xl:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
                 eyeContact.enabled
                   ? 'bg-cyan-600/25 text-cyan-300 border border-cyan-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
@@ -672,7 +659,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
             {/* Dynamic Captions button */}
             <button
               onClick={() => setIsCaptionsOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2 xl:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
                 captions.enabled
                   ? 'bg-pink-600/25 text-pink-300 border border-pink-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-white/[0.06]'
@@ -686,7 +673,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
             {/* Canvas Effects & Transitions button */}
             <button
               onClick={() => setIsTransitionsOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
                 backgroundRemovalEnabled || studioLightingEnabled
                   ? 'bg-amber-600/25 text-amber-300 border border-amber-500/30'
                   : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
@@ -694,59 +681,60 @@ export const EditorView: React.FC<EditorViewProps> = ({
               title="Canvas Effects, AI Green Screen & Transitions"
             >
               <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>Effects</span>
+              <span className="sr-only 2xl:not-sr-only">Effects</span>
             </button>
 
             {/* Multicam button */}
             <button
               onClick={() => setIsMulticamOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer shrink-0"
               title="Multicam Director"
             >
               <Camera className="w-3.5 h-3.5 text-blue-400" />
-              <span>Multicam ({multicamAngles.length})</span>
+              <span className="sr-only 2xl:not-sr-only">Multicam ({multicamAngles.length})</span>
             </button>
 
             {/* Teleprompter button */}
             <button
               onClick={() => setIsTeleprompterOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer shrink-0"
               title="Teleprompter Readout"
             >
               <FileText className="w-3.5 h-3.5 text-amber-400" />
-              <span>Teleprompter</span>
+              <span className="sr-only 2xl:not-sr-only">Teleprompter</span>
             </button>
 
             {/* Overdub Voice Clone */}
             <button
               onClick={() => setIsVoiceCloningOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer shrink-0"
               title="Voice Clone & Overdub"
             >
               <Mic className="w-3.5 h-3.5 text-purple-400" />
-              <span>Overdub</span>
+              <span className="sr-only 2xl:not-sr-only">Overdub</span>
             </button>
 
             {/* Screen Recorder */}
             <button
               onClick={() => setIsRecorderOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/[0.06] text-xs font-semibold transition-colors cursor-pointer shrink-0"
               title="Screen & Cam Recorder"
             >
               <VideoIcon className="w-3.5 h-3.5 text-rose-400" />
-              <span>Record</span>
+              <span className="sr-only 2xl:not-sr-only">Record</span>
             </button>
           </div>
 
           {/* Right Action buttons */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Comments button */}
             <button
               onClick={() => setIsCommentsOpen(!isCommentsOpen)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer min-h-[40px]"
+              title="Collaboration & Review Comments"
+              className="hidden lg:flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white text-xs font-medium transition-colors cursor-pointer min-h-[38px] shrink-0"
             >
               <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Comments</span>
+              <span className="sr-only 2xl:not-sr-only">Comments</span>
               {comments.length > 0 && (
                 <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
                   {comments.length}
@@ -755,12 +743,12 @@ export const EditorView: React.FC<EditorViewProps> = ({
             </button>
 
             {/* Aspect ratio selector */}
-            <div className="hidden sm:flex items-center bg-black/40 p-0.5 rounded-xl border border-white/[0.08]">
+            <div className="hidden sm:flex items-center bg-black/40 p-0.5 rounded-xl border border-white/[0.08] shrink-0">
               {(['16:9', '9:16', '1:1'] as AspectRatio[]).map((ratio) => (
                 <button
                   key={ratio}
                   onClick={() => setAspectRatio(ratio)}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-mono font-medium transition-colors cursor-pointer min-h-[32px] ${
+                  className={`px-1.5 xl:px-2 py-1 rounded-lg text-[11px] font-mono font-medium transition-colors cursor-pointer min-h-[30px] ${
                     aspectRatio === ratio
                       ? 'bg-white/10 text-white'
                       : 'text-slate-400 hover:text-white'
@@ -774,18 +762,18 @@ export const EditorView: React.FC<EditorViewProps> = ({
             {/* Export Studio button */}
             <button
               onClick={() => setIsExportOpen(true)}
-              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer min-h-[44px]"
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer min-h-[40px] shrink-0"
               title="Export 4K Master, NLE XML, or Stems"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden xs:inline">Export</span>
-              <span className="hidden sm:inline">4K</span>
+              <span className="hidden 2xl:inline">4K</span>
             </button>
 
             {/* Share & Publish Viewways button */}
             <button
               onClick={() => setIsShareModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer min-h-[44px]"
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer min-h-[40px] shrink-0"
               title="Publish interactive viewway, generate embed code, or invite reviewers"
             >
               <Share2 className="w-3.5 h-3.5" />
@@ -912,17 +900,17 @@ export const EditorView: React.FC<EditorViewProps> = ({
         {/* Left: Text-Based Script Editor (Order 2 on Mobile, Order 1 on Desktop) */}
         <div className="order-2 lg:order-1 flex-1 flex flex-col border-t lg:border-t-0 lg:border-r border-white/[0.08] bg-[#121622]/60 overflow-hidden">
           {/* Transcript Control Toolbar */}
-          <div className="h-10 px-5 border-b border-white/[0.06] bg-[#121622] flex items-center justify-between text-xs text-slate-400">
-            <div className="flex items-center gap-3">
+          <div className="min-h-10 h-auto py-1.5 px-3 sm:px-5 border-b border-white/[0.06] bg-[#121622] flex items-center justify-between text-xs text-slate-400 gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <span className="font-semibold text-white">Document Script</span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[10px] sm:text-[11px] text-slate-400 whitespace-nowrap">
                 {activeWords.length} words • {formatTime(duration)}
               </span>
 
               {words.filter((w) => w.isFiller && !w.deleted).length > 0 && (
                 <button
                   onClick={removeAllFillerWords}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/25 text-[11px] hover:bg-amber-500/25 transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/25 text-[10px] sm:text-[11px] hover:bg-amber-500/25 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <Trash2 className="w-3 h-3" />
                   <span>Remove {words.filter((w) => w.isFiller && !w.deleted).length} Fillers</span>
@@ -930,7 +918,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-slate-500" />
                 <input
@@ -938,13 +926,13 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   value={searchWordQuery}
                   onChange={(e) => setSearchWordQuery(e.target.value)}
                   placeholder="Find word in script..."
-                  className="pl-7 pr-2 py-1 rounded-lg bg-black/40 border border-white/10 text-[11px] text-white focus:outline-none focus:border-indigo-500 w-36"
+                  className="pl-7 pr-2 py-1 rounded-lg bg-black/40 border border-white/10 text-[11px] text-white focus:outline-none focus:border-indigo-500 w-24 xs:w-28 sm:w-36"
                 />
               </div>
 
               <button
                 onClick={() => setShowDeletedWords(!showDeletedWords)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                   showDeletedWords ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -954,7 +942,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
               <button
                 onClick={() => setIsVoiceCloningOpen(true)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-600/20 text-purple-300 border border-purple-500/30 text-[11px] hover:bg-purple-600/30 transition-colors cursor-pointer"
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-600/20 text-purple-300 border border-purple-500/30 text-[11px] hover:bg-purple-600/30 transition-colors cursor-pointer shrink-0"
               >
                 <Plus className="w-3 h-3" />
                 <span>Overdub</span>
@@ -963,37 +951,37 @@ export const EditorView: React.FC<EditorViewProps> = ({
           </div>
 
           {/* Transcript Document View (Strictly Chronological Speaker Turns) */}
-          <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto ios-scroll p-4 sm:p-8 space-y-6 text-sm leading-relaxed font-sans relative pb-[calc(env(safe-area-inset-bottom)+40px)]">
+          <main id="main-content" tabIndex={-1} className="flex-1 min-h-[140px] overflow-y-auto ios-scroll p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 text-sm leading-relaxed font-sans relative pb-[calc(env(safe-area-inset-bottom)+40px)]">
             {/* Floating Word Action Toolbar on Word Selection */}
             {selectedWord && (
-              <div className="sticky top-0 z-30 mb-4 p-2 sm:p-2.5 rounded-2xl ios-glass border border-indigo-500/40 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800">
+              <div className="sticky top-0 z-30 mb-2 sm:mb-4 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl ios-glass border border-indigo-500/40 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 text-xs">
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <span className="font-mono text-[9px] sm:text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 sm:px-2 py-0.5 rounded border border-indigo-800">
                       {formatTime(selectedWord.start)}
                     </span>
-                    <span className="font-bold text-white max-w-[140px] truncate">
+                    <span className="font-bold text-white max-w-[120px] sm:max-w-[140px] truncate text-xs sm:text-sm">
                       "{selectedWord.text}"
                     </span>
                     {selectedWord.deleted && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono">
+                      <span className="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono">
                         Cut
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => setSelectedWordId(null)}
-                    className="sm:hidden p-2 rounded-lg text-slate-400 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                    className="sm:hidden p-1 rounded-lg text-slate-400 hover:text-white min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
                     title="Close selection"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                   <button
                     onClick={() => handleStartInlineEdit(selectedWord)}
-                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer min-h-[44px] shrink-0"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
                     title="Correct spelling without altering audio (C)"
                   >
                     <Type className="w-3.5 h-3.5 text-indigo-400" />
@@ -1003,7 +991,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   {selectedWord.deleted ? (
                     <button
                       onClick={() => restoreWord(selectedWord.id)}
-                      className="px-3 py-2 rounded-xl bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer min-h-[44px] shrink-0"
+                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
                       title="Restore cut segment into video"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1012,7 +1000,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   ) : (
                     <button
                       onClick={() => deleteWord(selectedWord.id)}
-                      className="px-3 py-2 rounded-xl bg-rose-600/25 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer min-h-[44px] shrink-0"
+                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-rose-600/25 text-rose-300 border border-rose-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
                       title="Cut word from video & skip playback (Delete / Backspace)"
                     >
                       <Scissors className="w-3.5 h-3.5" />
@@ -1028,7 +1016,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                         setIsPlaying(true);
                       }
                     }}
-                    className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30 min-h-[44px] shrink-0"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30 min-h-[36px] sm:min-h-[40px] shrink-0"
                     title="Play video from this word"
                   >
                     <Play className="w-3.5 h-3.5" />
@@ -1037,7 +1025,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
                   <button
                     onClick={() => setIsVoiceCloningOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-purple-600/25 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer min-h-[44px] shrink-0"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-purple-600/25 text-purple-300 border border-purple-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
                     title="Synthesize AI voice replacement"
                   >
                     <Mic className="w-3.5 h-3.5" />
@@ -1049,7 +1037,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                       setCurrentTime(selectedWord.start);
                       setIsCommentsOpen(true);
                     }}
-                    className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer min-h-[44px] shrink-0"
+                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-[11px] sm:text-xs font-medium flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
                     title="Leave comment at this word timestamp"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
@@ -1058,7 +1046,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
                   <button
                     onClick={() => setSelectedWordId(null)}
-                    className="hidden sm:flex p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1 min-h-[44px] min-w-[44px] items-center justify-center shrink-0"
+                    className="hidden sm:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1 min-h-[36px] min-w-[36px] items-center justify-center shrink-0"
                     title="Close selection"
                   >
                     <X className="w-4 h-4" />
@@ -1196,17 +1184,23 @@ export const EditorView: React.FC<EditorViewProps> = ({
           <div
             className={`relative rounded-xl lg:rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10 flex items-center justify-center transition-all ${
               aspectRatio === '16:9'
-                ? 'w-full max-w-sm sm:max-w-md lg:max-w-2xl aspect-video max-h-[28vh] lg:max-h-none'
+                ? 'w-full max-w-sm sm:max-w-md lg:max-w-2xl aspect-video max-h-[22vh] sm:max-h-[28vh] lg:max-h-none'
                 : aspectRatio === '9:16'
-                ? 'h-full max-h-[26vh] lg:max-h-[500px] aspect-[9/16]'
-                : 'w-[220px] sm:w-[320px] lg:w-[420px] aspect-square max-h-[26vh] lg:max-h-none'
+                ? 'h-full max-h-[24vh] sm:max-h-[26vh] lg:max-h-[500px] aspect-[9/16]'
+                : 'w-[220px] sm:w-[320px] lg:w-[420px] aspect-square max-h-[24vh] sm:max-h-[26vh] lg:max-h-none'
             }`}
           >
             {/* HTML5 Video element */}
             <video
               ref={videoRef}
               src={videoSourceUrl}
+              crossOrigin="anonymous"
               playsInline
+              onPlay={() => {
+                setIsPlaying(true);
+                audioEngineRef.current?.resumeContext();
+              }}
+              onPause={() => setIsPlaying(false)}
               className={`w-full h-full object-cover transition-all ${
                 backgroundRemovalEnabled ? 'blur-[1px] saturate-125' : ''
               } ${studioLightingEnabled ? 'contrast-110 brightness-105' : ''}`}
@@ -1214,7 +1208,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
             {/* AI Eye Contact Canvas Overlay Indicator */}
             {eyeContact.enabled && (
-              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[10px] font-mono text-cyan-300 flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
+              <div className="absolute top-2 left-2 sm:top-3 sm:left-3 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-[9px] sm:text-[10px] font-mono text-cyan-300 flex items-center gap-1 sm:gap-1.5 shadow-lg backdrop-blur-sm z-10">
                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                 <span>AI Eye Contact Locked ({eyeContact.intensity}%)</span>
               </div>
@@ -1222,7 +1216,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
             {/* Studio Sound Badge Overlay */}
             {studioSound.enabled && (
-              <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-indigo-950/80 border border-indigo-500/40 text-[10px] font-mono text-indigo-300 flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
+              <div className="absolute top-7 sm:top-3 left-2 sm:left-auto sm:right-3 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-indigo-950/80 border border-indigo-500/40 text-[9px] sm:text-[10px] font-mono text-indigo-300 flex items-center gap-1 sm:gap-1.5 shadow-lg backdrop-blur-sm z-10">
                 <Volume2 className="w-3 h-3 text-indigo-400" />
                 <span>Studio Sound Active (-14 LUFS)</span>
               </div>
@@ -1319,6 +1313,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
           }
         }}
         isPlaying={isPlaying}
+        audioEngine={audioEngineRef.current}
       />
 
       <VoiceCloningModal

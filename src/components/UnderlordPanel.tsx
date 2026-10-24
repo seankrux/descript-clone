@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WordToken } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface UnderlordPanelProps {
   isOpen: boolean;
@@ -53,6 +54,8 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
   const [summaryResult, setSummaryResult] = useState<{ summary: string; takeaways: string[]; chapters: { time: string; title: string }[] } | null>(null);
   const [selectedLang, setSelectedLang] = useState('Spanish');
 
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const fillerWords = words.filter((w) => w.isFiller && !w.deleted);
@@ -61,10 +64,18 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
     e.preventDefault();
     if (!customPrompt.trim()) return;
 
+    const promptLower = customPrompt.toLowerCase();
     setIsProcessing(true);
     setAiMessage(null);
 
     setTimeout(() => {
+      if (promptLower.includes('filler') || promptLower.includes('um')) {
+        onRemoveAllFillerWords();
+      } else if (promptLower.includes('silence') || promptLower.includes('pause') || promptLower.includes('gap')) {
+        onShortenSilences();
+      } else if (promptLower.includes('clarity') || promptLower.includes('concise') || promptLower.includes('ramble')) {
+        onApplyClarityEdit();
+      }
       setIsProcessing(false);
       setAiMessage(`Underlord processed: "${customPrompt}". Transcript cadence optimized and speech rhythm synchronized!`);
       setCustomPrompt('');
@@ -73,7 +84,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
         spread: 50,
         origin: { y: 0.6 }
       });
-    }, 900);
+    }, 500);
   };
 
   const generateSummary = () => {
@@ -100,7 +111,16 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[420px] max-w-full bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex justify-end"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="underlord-panel-title"
+        className="w-full sm:w-[420px] max-w-full h-full bg-[#121622] border-l border-white/[0.1] shadow-2xl flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe"
+      >
       {/* Top Header */}
       <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
         <div className="flex items-center gap-2.5">
@@ -109,7 +129,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-white">Underlord AI</span>
+              <h3 id="underlord-panel-title" className="font-bold text-sm text-white">Underlord AI</h3>
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 Copilot 2.0
               </span>
@@ -120,6 +140,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
         <button
           onClick={onClose}
           title="Close Underlord"
+          aria-label="Close Underlord"
           className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
         >
           <X className="w-4 h-4" />
@@ -530,6 +551,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 };

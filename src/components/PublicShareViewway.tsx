@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Project, WordToken, CommentItem, CommentReaction } from '../types';
 import { api } from '../utils/apiService';
+import { computeNonDestructiveSkipTarget } from '../utils/exportGenerators';
 
 interface PublicShareViewwayProps {
   project: Project;
@@ -62,11 +63,14 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isCommentsOpen, setIsCommentsOpen] = useState(initialTab === 'review');
+  const allowComments = project.shareSettings?.allowComments !== false;
+  const allowTranscriptSearch = project.shareSettings?.allowTranscriptSearch !== false;
+  const [isCommentsOpen, setIsCommentsOpen] = useState(initialTab === 'review' && allowComments);
   const [isPasscodeUnlocked, setIsPasscodeUnlocked] = useState(
     project.shareSettings?.accessLevel !== 'passcode'
   );
   const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState<string | null>(null);
 
   // Comment input state
   const [guestName, setGuestName] = useState('Guest Reviewer');
@@ -77,13 +81,31 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
   const scriptContainerRef = useRef<HTMLDivElement | null>(null);
 
   const words = project.scenes[0]?.words || [];
+  const silenceSkipRanges = project.silenceSkipRanges || project.scenes[0]?.silenceSkipRanges || [];
   const activeWords = words.filter((w) => !w.deleted);
   const comments = project.comments || [];
 
   const videoUrl =
     project.multicamAngles?.[0]?.videoUrl ||
     project.scenes[0]?.videoClipUrl ||
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    '/sample-studio.mp4';
+
+  // Parse ?t=<seconds> on mount so quote deep links seek the video on load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tParam = params.get('t');
+      if (tParam !== null) {
+        const parsedTime = parseFloat(tParam);
+        if (!isNaN(parsedTime) && parsedTime >= 0) {
+          setCurrentTime(parsedTime);
+          if (videoRef.current) {
+            videoRef.current.currentTime = parsedTime;
+          }
+        }
+      }
+    }
+  }, []);
 
   // Keep playback synced
   const togglePlay = () => {
@@ -97,13 +119,22 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
 
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
-    setCurrentTime(videoRef.current.currentTime);
+    const cur = videoRef.current.currentTime;
+    const skipTarget = computeNonDestructiveSkipTarget(cur, words, silenceSkipRanges);
+    if (skipTarget !== null) {
+      videoRef.current.currentTime = skipTarget;
+      setCurrentTime(skipTarget);
+      return;
+    }
+    setCurrentTime(cur);
   };
 
   const handleSeek = (time: number) => {
     if (!videoRef.current) return;
-    videoRef.current.currentTime = time;
-    setCurrentTime(time);
+    const skipTarget = computeNonDestructiveSkipTarget(time, words, silenceSkipRanges);
+    const finalTime = skipTarget !== null ? skipTarget : time;
+    videoRef.current.currentTime = finalTime;
+    setCurrentTime(finalTime);
   };
 
   const handleRateChange = (rate: number) => {
@@ -257,17 +288,39 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              setIsPasscodeUnlocked(true);
+              const expectedPasscode = (project.shareSettings?.passcode && project.shareSettings.passcode.trim()) || '1234';
+              const trimmed = passcodeInput.trim();
+              if (!trimmed) {
+                setIsPasscodeUnlocked(false);
+                setPasscodeError('Please enter a passcode.');
+                return;
+              }
+              if (trimmed === expectedPasscode) {
+                setPasscodeError(null);
+                setIsPasscodeUnlocked(true);
+              } else {
+                setIsPasscodeUnlocked(false);
+                setPasscodeError('Incorrect passcode. Please try again.');
+              }
             }}
             className="space-y-4"
           >
             <input
               type="password"
               value={passcodeInput}
-              onChange={(e) => setPasscodeInput(e.target.value)}
-              placeholder="Enter passcode (e.g. 2026)"
+              onChange={(e) => {
+                setPasscodeInput(e.target.value);
+                if (passcodeError) setPasscodeError(null);
+              }}
+              placeholder="Enter passcode (e.g. 1234)"
+              aria-label="Passcode"
               className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-center font-mono text-sm tracking-widest text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
+            {passcodeError && (
+              <p role="alert" className="text-xs text-rose-400 font-medium">
+                {passcodeError}
+              </p>
+            )}
             <button
               type="submit"
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-90 font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
@@ -312,42 +365,46 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
           {/* Header Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2.5">
             {/* Transcript Search Toggle */}
-            <div className="relative hidden xs:flex items-center">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search script..."
-                className="w-28 sm:w-56 pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all min-h-[38px]"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 text-slate-400 hover:text-white cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+            {allowTranscriptSearch && (
+              <div className="relative hidden xs:flex items-center">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search script..."
+                  className="w-28 sm:w-56 pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all min-h-[38px]"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Comments Panel Button */}
-            <button
-              onClick={() => setIsCommentsOpen(!isCommentsOpen)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer min-h-[40px] ${
-                isCommentsOpen
-                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
-                  : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:text-white hover:bg-white/[0.08]'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Review</span>
-              {comments.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
-                  {comments.length}
-                </span>
-              )}
-            </button>
+            {allowComments && (
+              <button
+                onClick={() => setIsCommentsOpen(!isCommentsOpen)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-colors cursor-pointer min-h-[40px] ${
+                  isCommentsOpen
+                    ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+                    : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:text-white hover:bg-white/[0.08]'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Review</span>
+                {comments.length > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-indigo-600 text-[10px] flex items-center justify-center font-bold text-white">
+                    {comments.length}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Copy Share Link */}
             <button
@@ -392,7 +449,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
         {/* Video Stage Area */}
         <div className="w-full lg:flex-1 flex flex-col bg-black/60 items-center justify-center p-3 sm:p-6 relative shrink-0 border-b lg:border-b-0 border-white/[0.08]">
           <div
-            className={`relative rounded-xl lg:rounded-2xl overflow-hidden shadow-2xl bg-black border border-white/10 flex items-center justify-center transition-all ${
+            className={`relative rounded-xl lg:rounded-2xl overflow-hidden shadow-2xl bg-slate-950 border border-white/10 flex items-center justify-center transition-all ${
               project.aspectRatio === '9:16'
                 ? 'w-[200px] sm:w-[320px] aspect-[9/16] max-h-[30vh] lg:max-h-[568px]'
                 : project.aspectRatio === '1:1'
@@ -400,13 +457,30 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
                 : 'w-full max-w-sm sm:max-w-2xl lg:max-w-4xl aspect-video max-h-[30vh] lg:max-h-none'
             }`}
           >
+            {project.thumbnail && (
+              <img
+                src={project.thumbnail}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover opacity-40 pointer-events-none"
+              />
+            )}
             <video
               ref={videoRef}
               src={videoUrl}
-              className="w-full h-full object-cover"
+              poster={project.thumbnail}
+              crossOrigin="anonymous"
+              preload="auto"
+              playsInline
+              className="relative z-[1] w-full h-full object-cover"
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={() => {
-                if (videoRef.current) setDuration(videoRef.current.duration);
+                if (videoRef.current) {
+                  setDuration(videoRef.current.duration);
+                  if (currentTime > 0) {
+                    videoRef.current.currentTime = currentTime;
+                  }
+                }
               }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}

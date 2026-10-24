@@ -26,7 +26,7 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
   config,
   onChange,
 }) => {
-  useModalDismiss(isOpen, onClose);
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -41,11 +41,15 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dynamic-captions-title"
-      className="fixed inset-y-0 right-0 w-full sm:w-[400px] max-w-full bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe"
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex justify-end"
     >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dynamic-captions-title"
+        className="w-full sm:w-[400px] max-w-full h-full bg-[#121622] border-l border-white/[0.1] shadow-2xl flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe"
+      >
       {/* Header */}
       <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
         <div className="flex items-center gap-2.5">
@@ -177,6 +181,10 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
           <div className="flex items-center justify-between pt-1">
             <span className="text-xs text-slate-300">Uppercase All Caps</span>
             <button
+              type="button"
+              role="switch"
+              aria-checked={config.uppercase}
+              aria-label="Uppercase All Caps"
               onClick={() => onChange({ ...config, uppercase: !config.uppercase })}
               className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
                 config.uppercase ? 'bg-pink-600' : 'bg-slate-700'
@@ -193,6 +201,10 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-300">Background Box Pill</span>
             <button
+              type="button"
+              role="switch"
+              aria-checked={config.backgroundBox}
+              aria-label="Background Box Pill"
               onClick={() => onChange({ ...config, backgroundBox: !config.backgroundBox })}
               className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
                 config.backgroundBox ? 'bg-pink-600' : 'bg-slate-700'
@@ -209,6 +221,10 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-300">Glow & Text Shadow</span>
             <button
+              type="button"
+              role="switch"
+              aria-checked={config.textShadow}
+              aria-label="Glow and Text Shadow"
               onClick={() => onChange({ ...config, textShadow: !config.textShadow })}
               className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${
                 config.textShadow ? 'bg-pink-600' : 'bg-slate-700'
@@ -255,6 +271,7 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
           Save & Apply
         </button>
       </div>
+    </div>
     </div>
   );
 };

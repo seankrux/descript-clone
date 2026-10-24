@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { StudioSoundConfig } from '../types';
 import { useModalDismiss } from '../utils/useModalDismiss';
+import { StudioAudioEngine } from '../utils/audioDsp';
 
 interface StudioSoundSuiteProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface StudioSoundSuiteProps {
   config: StudioSoundConfig;
   onChange: (updated: StudioSoundConfig) => void;
   isPlaying: boolean;
+  audioEngine?: StudioAudioEngine | null;
 }
 
 export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
@@ -28,10 +30,11 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
   config,
   onChange,
   isPlaying,
+  audioEngine,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Animated visualizer
+  // Real Web Audio AnalyserNode FFT visualizer (with idle preview curve when paused)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -40,6 +43,7 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
 
     let animId: number;
     let offset = 0;
+    const fftBins = new Uint8Array(64);
 
     const render = () => {
       const width = canvas.width;
@@ -48,29 +52,35 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
 
       const barCount = 36;
       const barWidth = width / barCount;
+      const hasLiveFft = isPlaying && audioEngine ? audioEngine.getFrequencyData(fftBins) : false;
 
       for (let i = 0; i < barCount; i++) {
         let barHeight = 8;
-        if (config.enabled && isPlaying) {
-          // Vibrant sound curve
-          const freq = Math.sin(offset + i * 0.25) * 0.5 + 0.5;
-          const noise = Math.cos(offset * 1.5 + i * 0.4) * 0.3;
-          barHeight = Math.max(6, (freq + noise) * (height - 12) * (config.intensity / 100));
+        if (hasLiveFft) {
+          const binValue = fftBins[i % fftBins.length] / 255;
+          const gainScale = config.enabled ? Math.max(0.35, config.intensity / 100) : 0.75;
+          barHeight = Math.max(6, binValue * (height - 10) * gainScale);
         } else if (isPlaying) {
-          // Raw noisy audio (rough jagged bars)
-          barHeight = Math.max(4, (Math.random() * 0.6 + 0.2) * (height - 16));
+          // Active playback fallback envelope if browser audio context is suspended
+          const freq = Math.sin(offset + i * 0.25) * 0.45 + 0.5;
+          const harmonic = Math.cos(offset * 1.4 + i * 0.35) * 0.25;
+          const scale = config.enabled ? Math.max(0.3, config.intensity / 100) : 0.65;
+          barHeight = Math.max(6, (freq + harmonic) * (height - 12) * scale);
+        } else {
+          // Static idle EQ transfer curve preview when paused
+          const curve = Math.sin((i / barCount) * Math.PI) * 0.45 + 0.15;
+          const scale = config.enabled ? Math.max(0.25, config.intensity / 100) : 0.4;
+          barHeight = Math.max(6, curve * (height - 16) * scale);
         }
 
         const y = (height - barHeight) / 2;
 
         if (config.enabled && config.abMode === 'processed') {
-          // Studio sound gradient
           const grad = ctx.createLinearGradient(0, y, 0, y + barHeight);
           grad.addColorStop(0, '#818cf8');
           grad.addColorStop(1, '#6366f1');
           ctx.fillStyle = grad;
         } else {
-          // Raw audio (dull grey/amber)
           ctx.fillStyle = '#64748b';
         }
 
@@ -85,7 +95,7 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
 
     render();
     return () => cancelAnimationFrame(animId);
-  }, [config.enabled, config.intensity, config.abMode, isPlaying]);
+  }, [config.enabled, config.intensity, config.abMode, isPlaying, audioEngine]);
 
   const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
 
@@ -145,6 +155,10 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-checked={config.enabled}
+              aria-label="Enable Studio Sound"
               onClick={() => onChange({ ...config, enabled: !config.enabled })}
               className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${
                 config.enabled ? 'bg-indigo-600' : 'bg-slate-700'
@@ -163,12 +177,13 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-indigo-400" />
-                Live Frequency Spectrum
+                {isPlaying ? 'Live FFT Frequency Spectrum' : 'EQ Transfer Curve Preview (Paused)'}
               </span>
               <div className="flex items-center gap-1 bg-white/[0.06] p-0.5 rounded-lg border border-white/[0.08]">
                 <button
+                  type="button"
                   onClick={() => onChange({ ...config, abMode: 'processed' })}
-                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                     config.abMode === 'processed'
                       ? 'bg-indigo-600 text-white shadow'
                       : 'text-slate-400 hover:text-white'
@@ -177,8 +192,9 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
                   Studio Sound (AB)
                 </button>
                 <button
+                  type="button"
                   onClick={() => onChange({ ...config, abMode: 'raw' })}
-                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
                     config.abMode === 'raw'
                       ? 'bg-amber-600 text-white shadow'
                       : 'text-slate-400 hover:text-white'
@@ -236,9 +252,14 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
 
           {/* Precision Audio Toggles */}
           <div className="grid grid-cols-2 gap-3 pt-2">
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-checked={config.humRemoval}
+              aria-label="50/60Hz Hum Gate"
+              disabled={!config.enabled}
               onClick={() => config.enabled && onChange({ ...config, humRemoval: !config.humRemoval })}
-              className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+              className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors text-left ${
                 config.humRemoval && config.enabled
                   ? 'bg-indigo-950/30 border-indigo-500/40 text-white'
                   : 'bg-white/[0.02] border-white/[0.06] text-slate-400 opacity-60'
@@ -249,11 +270,16 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
                 <span className="text-xs font-medium">50/60Hz Hum Gate</span>
               </div>
               {config.humRemoval && config.enabled && <Check className="w-3.5 h-3.5 text-indigo-400" />}
-            </div>
+            </button>
 
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-checked={config.loudnessNorm}
+              aria-label="-14 LUFS Broadcast"
+              disabled={!config.enabled}
               onClick={() => config.enabled && onChange({ ...config, loudnessNorm: !config.loudnessNorm })}
-              className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+              className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors text-left ${
                 config.loudnessNorm && config.enabled
                   ? 'bg-indigo-950/30 border-indigo-500/40 text-white'
                   : 'bg-white/[0.02] border-white/[0.06] text-slate-400 opacity-60'
@@ -264,13 +290,14 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
                 <span className="text-xs font-medium">-14 LUFS Broadcast</span>
               </div>
               {config.loudnessNorm && config.enabled && <Check className="w-3.5 h-3.5 text-indigo-400" />}
-            </div>
+            </button>
           </div>
         </div>
 
         {/* Footer */}
         <div className="p-4 border-t border-white/[0.08] bg-[#161b2a] flex items-center justify-between">
           <button
+            type="button"
             onClick={() =>
               onChange({
                 enabled: true,
@@ -281,14 +308,15 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
                 abMode: 'processed',
               })
             }
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset to Studio Defaults</span>
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-lg shadow-indigo-600/20"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-lg shadow-indigo-600/20 cursor-pointer"
           >
             Apply & Close
           </button>

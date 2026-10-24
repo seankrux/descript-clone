@@ -142,7 +142,7 @@ export const App: React.FC = () => {
           words: SAMPLE_PROJECTS[0].scenes[0].words,
           videoClipUrl:
             type === 'video'
-              ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+              ? '/sample-studio.mp4'
               : '',
         },
       ],
@@ -193,9 +193,18 @@ export const App: React.FC = () => {
       tempMedia.preload = 'metadata';
       tempMedia.src = fileUrl;
 
-      const finishCreate = (dur: number) => {
+      const finishCreate = async (dur: number) => {
         const safeDuration = dur && !isNaN(dur) && isFinite(dur) ? Math.round(dur * 10) / 10 : 21.6;
-        const newProj = createProjectFromRecording(title, fileUrl, safeDuration);
+        let precomputedWords;
+        try {
+          const res = await api.requestTranscription(title, safeDuration);
+          if (res && Array.isArray(res) && res.length > 0) {
+            precomputedWords = res;
+          }
+        } catch {
+          // Local fallback handled below
+        }
+        const newProj = createProjectFromRecording(title, fileUrl, safeDuration, undefined, precomputedWords);
         newProj.type = isVideo ? 'video' : 'audio';
         setProjects((prev) => [newProj, ...prev]);
         handleOpenProject(newProj.id);
@@ -211,9 +220,32 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSaveRecording = (videoUrl: string, title: string) => {
-    const newProj = createProjectFromRecording(title, videoUrl, 18.0);
-    setProjects([newProj, ...projects]);
+  const handleSaveRecording = async (
+    videoUrl: string,
+    title: string,
+    durationSec: number = 18.0,
+    customTranscript?: string
+  ) => {
+    const safeDuration = durationSec > 0 ? durationSec : 18.0;
+    let precomputedWords;
+    if (!customTranscript) {
+      try {
+        const res = await api.requestTranscription(title, safeDuration);
+        if (res && Array.isArray(res) && res.length > 0) {
+          precomputedWords = res;
+        }
+      } catch {
+        // Local fallback
+      }
+    }
+    const newProj = createProjectFromRecording(
+      title,
+      videoUrl,
+      safeDuration,
+      customTranscript,
+      precomputedWords
+    );
+    setProjects((prev) => [newProj, ...prev]);
     handleOpenProject(newProj.id);
   };
 

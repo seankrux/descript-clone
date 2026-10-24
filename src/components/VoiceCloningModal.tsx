@@ -16,6 +16,7 @@ import confetti from 'canvas-confetti';
 import { VoiceClone, WordToken } from '../types';
 import { SAMPLE_VOICE_CLONES } from '../data/sampleProjects';
 import { useModalDismiss } from '../utils/useModalDismiss';
+import { api } from '../utils/apiService';
 
 interface VoiceCloningModalProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
     }
   };
 
-  const handleSynthesize = (e: React.FormEvent) => {
+  const handleSynthesize = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!overdubText.trim()) return;
 
@@ -82,18 +83,29 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
       window.speechSynthesis.speak(utterance);
     }
 
-    setTimeout(() => {
-      setIsGenerating(false);
+    const selectedVoice = voices.find((v) => v.id === selectedVoiceId);
+    const speakerName = selectedVoice ? selectedVoice.name.split(' ')[0] : 'Voice';
 
-      // Break text into WordTokens
+    let generatedTokens: WordToken[] | null = null;
+    try {
+      const apiRes = await api.requestOverdub(overdubText.trim(), currentTime, selectedVoiceId);
+      if (apiRes && Array.isArray(apiRes) && apiRes.length > 0) {
+        generatedTokens = apiRes.map((t: WordToken) => ({
+          ...t,
+          speaker: speakerName,
+          isOverdub: true,
+        }));
+      }
+    } catch {
+      // Fallback to local synthesis below
+    }
+
+    if (!generatedTokens) {
       const wordsArr = overdubText.trim().split(/\s+/);
       const startBase = currentTime;
       const durationPerWord = 0.35;
 
-      const selectedVoice = voices.find((v) => v.id === selectedVoiceId);
-      const speakerName = selectedVoice ? selectedVoice.name.split(' ')[0] : 'Voice';
-
-      const generatedTokens: WordToken[] = wordsArr.map((text, idx) => ({
+      generatedTokens = wordsArr.map((text, idx) => ({
         id: `overdub-${Date.now()}-${idx}`,
         text,
         start: Number((startBase + idx * durationPerWord).toFixed(2)),
@@ -102,14 +114,18 @@ export const VoiceCloningModal: React.FC<VoiceCloningModalProps> = ({
         isFiller: false,
         isOverdub: true,
       }));
+    }
 
-      onInsertOverdub(generatedTokens);
-      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-      if (onNotify) {
-        onNotify('Overdub Synthesized', `Inserted ${wordsArr.length} tokens into script at ${currentTime.toFixed(1)}s using ${selectedVoice?.name}`);
-      }
-      onClose();
-    }, 800);
+    setIsGenerating(false);
+    onInsertOverdub(generatedTokens);
+    confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+    if (onNotify) {
+      onNotify(
+        'Overdub Synthesized',
+        `Inserted ${generatedTokens.length} tokens into script at ${currentTime.toFixed(1)}s using ${selectedVoice?.name}`
+      );
+    }
+    onClose();
   };
 
   const handleTrainVoice = (e: React.FormEvent) => {

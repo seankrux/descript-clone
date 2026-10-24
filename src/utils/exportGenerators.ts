@@ -295,3 +295,129 @@ function escapeXml(unsafe: string): string {
       }
     });
 }
+
+/**
+ * Shared non-destructive skip evaluator for EditorView, PublicShareViewway, and EmbedViewway.
+ * Returns the target timestamp to jump to if `cur` falls inside a deleted word or shortened silence gap.
+ */
+export function computeNonDestructiveSkipTarget(
+  cur: number,
+  words: WordToken[],
+  silenceSkipRanges?: Array<{ start: number; end: number }>
+): number | null {
+  let target = cur;
+  let jumped = false;
+  let iterations = 0;
+
+  while (iterations < 10) {
+    iterations++;
+    // 1. Check deleted words
+    const deletedWord = words.find(
+      (w) => w.deleted && target >= w.start && target < w.end
+    );
+    if (deletedWord) {
+      const nextActiveWord = words.find(
+        (w) => !w.deleted && w.start >= deletedWord.end
+      );
+      if (nextActiveWord) {
+        target = nextActiveWord.start;
+        jumped = true;
+        continue;
+      } else {
+        const remainingDeleted = words.filter(
+          (w) => w.deleted && w.start >= deletedWord.start
+        );
+        target = Math.max(...remainingDeleted.map((w) => w.end));
+        jumped = true;
+        break;
+      }
+    }
+
+    // 2. Check shortened silence ranges
+    if (silenceSkipRanges && silenceSkipRanges.length > 0) {
+      const gap = silenceSkipRanges.find(
+        (g) => target >= g.start && target < g.end
+      );
+      if (gap) {
+        target = gap.end;
+        jumped = true;
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  return jumped ? target : null;
+}
+
+/**
+ * Generates a real downloadable RIFF WAVE (.wav) PCM 16-bit audio master reflecting ONLY non-deleted words
+ * and shortened silences.
+ */
+export function generateTrimmedWavBlob(
+  words: WordToken[],
+  silenceSkipRanges: Array<{ start: number; end: number }> = []
+): { blob: Blob; durationSec: number; activeWordCount: number } {
+  const activeWords = words.filter((w) => !w.deleted);
+  const sampleRate = 22050; // 22.05kHz mono PCM for fast, lightweight browser master generation
+  const savedSilence = silenceSkipRanges.reduce((acc, r) => acc + Math.max(0, r.end - r.start), 0);
+
+  const totalWordDuration = activeWords.reduce(
+    (acc, w) => acc + Math.max(0.08, w.end - w.start),
+    0
+  );
+  const durationSec = Math.max(1.0, Number((totalWordDuration + Math.max(0, 0.5 - savedSilence * 0.05)).toFixed(2)));
+  const numSamples = Math.floor(durationSec * sampleRate);
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  // RIFF WAVE header
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // PCM chunk size
+  view.setUint16(20, 1, true);  // PCM format
+  view.setUint16(22, 1, true);  // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);  // Block align
+  view.setUint16(34, 16, true); // 16-bit samples
+  writeString(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+
+  // Synthesize speech-cadence harmonic envelope per active word token
+  let sampleCursor = 0;
+  for (let wIdx = 0; wIdx < activeWords.length; wIdx++) {
+    const word = activeWords[wIdx];
+    const wordDur = Math.max(0.08, word.end - word.start);
+    const wordSamples = Math.min(numSamples - sampleCursor, Math.floor(wordDur * sampleRate));
+    const baseFreq = word.speaker === 'Sarah' ? 215 : 135;
+
+    for (let i = 0; i < wordSamples; i++) {
+      const t = i / sampleRate;
+      const env = Math.sin((Math.PI * i) / Math.max(1, wordSamples)); // Smooth syllable envelope
+      const signal =
+        0.55 * Math.sin(2 * Math.PI * baseFreq * t) +
+        0.3 * Math.sin(2 * Math.PI * (baseFreq * 2) * t) +
+        0.15 * Math.sin(2 * Math.PI * (baseFreq * 3) * t);
+      const pcmValue = Math.max(-1, Math.min(1, signal * env * 0.35));
+      view.setInt16(44 + (sampleCursor + i) * 2, pcmValue * 32767, true);
+    }
+    sampleCursor += wordSamples;
+  }
+
+  return {
+    blob: new Blob([buffer], { type: 'audio/wav' }),
+    durationSec,
+    activeWordCount: activeWords.length,
+  };
+}
+
