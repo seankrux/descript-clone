@@ -12,6 +12,7 @@ import {
   RotateCcw 
 } from 'lucide-react';
 import { StudioSoundConfig } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface StudioSoundSuiteProps {
   isOpen: boolean;
@@ -86,11 +87,21 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [config.enabled, config.intensity, config.abMode, isPlaying]);
 
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="studio-sound-title"
+        className="w-full max-w-lg bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150"
+      >
         {/* Header */}
         <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
           <div className="flex items-center gap-3">
@@ -99,7 +110,7 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">Studio Sound Suite</h3>
+                <h3 id="studio-sound-title" className="font-bold text-sm text-white">Studio Sound Suite</h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   AI Neural Engine v3
                 </span>
@@ -111,7 +122,8 @@ export const StudioSoundSuite: React.FC<StudioSoundSuiteProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            aria-label="Close Studio Sound Suite"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

@@ -14,6 +14,7 @@ import {
   Circle 
 } from 'lucide-react';
 import { WordToken } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface TeleprompterViewProps {
   isOpen: boolean;
@@ -79,6 +80,8 @@ export const TeleprompterView: React.FC<TeleprompterViewProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [isScrolling, wpm]);
 
+  useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const scriptText = words
@@ -102,7 +105,12 @@ export const TeleprompterView: React.FC<TeleprompterViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#07090e] z-50 flex flex-col font-sans select-none overflow-hidden animate-in fade-in duration-150">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="teleprompter-title"
+      className="fixed inset-0 bg-[#07090e] z-50 flex flex-col font-sans select-none overflow-hidden animate-in fade-in duration-150"
+    >
       {/* Top Teleprompter Controls Header */}
       <div className="h-14 px-6 border-b border-white/[0.08] bg-[#121622] flex items-center justify-between z-20">
         <div className="flex items-center gap-3">
@@ -110,7 +118,7 @@ export const TeleprompterView: React.FC<TeleprompterViewProps> = ({
             TP
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Studio Teleprompter</h3>
+            <h3 id="teleprompter-title" className="text-sm font-bold text-white">Studio Teleprompter</h3>
             <span className="text-[10px] text-slate-400">Speech-synchronized autocue</span>
           </div>
         </div>

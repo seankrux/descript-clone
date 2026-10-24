@@ -1,5 +1,6 @@
 import React from 'react';
 import { Layers, Sparkles, X, Wand2, Check, Sliders, Sun, Move } from 'lucide-react';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface CanvasTransitionsModalProps {
   isOpen: boolean;
@@ -22,6 +23,8 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
   studioLightingEnabled,
   onToggleStudioLighting,
 }) => {
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const transitions = [
@@ -32,8 +35,16 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="canvas-transitions-title"
+        className="w-full max-w-md bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150"
+      >
         {/* Header */}
         <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
           <div className="flex items-center gap-3">
@@ -42,7 +53,7 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">Canvas Effects & Transitions</h3>
+                <h3 id="canvas-transitions-title" className="font-bold text-sm text-white">Canvas Effects & Transitions</h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   GPU Accelerated
                 </span>
@@ -54,7 +65,8 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            aria-label="Close Canvas Effects Modal"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Project, WordToken, ExportSettings } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 import { 
   generateSRT, 
   generateVTT, 
@@ -65,6 +66,8 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
   const [isRenderComplete, setIsRenderComplete] = useState(false);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [downloadSuccessItem, setDownloadSuccessItem] = useState<string | null>(null);
+
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -148,8 +151,16 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-xl bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-modal-title"
+        className="w-full max-w-xl bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]"
+      >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a] shrink-0">
           <div className="flex items-center gap-3">
@@ -158,7 +169,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">Enterprise Export & Publish</h3>
+                <h3 id="export-modal-title" className="font-bold text-sm text-white">Enterprise Export & Publish</h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hidden xs:inline">
                   Pro Studio
                 </span>

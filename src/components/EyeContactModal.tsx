@@ -1,6 +1,7 @@
 import React from 'react';
 import { Eye, Sparkles, X, Check, Shield, Sliders, Activity } from 'lucide-react';
 import { EyeContactConfig } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface EyeContactModalProps {
   isOpen: boolean;
@@ -15,11 +16,21 @@ export const EyeContactModal: React.FC<EyeContactModalProps> = ({
   config,
   onChange,
 }) => {
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="eye-contact-modal-title"
+        className="w-full max-w-md bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150"
+      >
         {/* Header */}
         <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
           <div className="flex items-center gap-3">
@@ -28,7 +39,7 @@ export const EyeContactModal: React.FC<EyeContactModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">AI Eye Contact</h3>
+                <h3 id="eye-contact-modal-title" className="font-bold text-sm text-white">AI Eye Contact</h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                   Gaze AI v2
                 </span>
@@ -40,7 +51,8 @@ export const EyeContactModal: React.FC<EyeContactModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            aria-label="Close Eye Contact Modal"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

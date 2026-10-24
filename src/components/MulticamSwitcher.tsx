@@ -1,6 +1,7 @@
 import React from 'react';
 import { Camera, X, Users, Check, Sparkles, Monitor, Video } from 'lucide-react';
 import { MulticamAngle } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface MulticamSwitcherProps {
   isOpen: boolean;
@@ -21,11 +22,21 @@ export const MulticamSwitcher: React.FC<MulticamSwitcherProps> = ({
   isAutoSpeakerCut,
   onToggleAutoSpeakerCut,
 }) => {
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="multicam-director-title"
+        className="w-full max-w-lg bg-[#121622] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden font-sans animate-in zoom-in-95 duration-150"
+      >
         {/* Header */}
         <div className="p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
           <div className="flex items-center gap-3">
@@ -34,7 +45,7 @@ export const MulticamSwitcher: React.FC<MulticamSwitcherProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm text-white">Multicam Director</h3>
+                <h3 id="multicam-director-title" className="font-bold text-sm text-white">Multicam Director</h3>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   {angles.length} Cameras
                 </span>
@@ -46,7 +57,8 @@ export const MulticamSwitcher: React.FC<MulticamSwitcherProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            aria-label="Close Multicam Director Modal"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

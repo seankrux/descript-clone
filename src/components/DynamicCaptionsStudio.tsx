@@ -11,6 +11,7 @@ import {
   Layers 
 } from 'lucide-react';
 import { CaptionConfig, CaptionPresetStyle } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface DynamicCaptionsStudioProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
   config,
   onChange,
 }) => {
+  useModalDismiss(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const presets: { id: CaptionPresetStyle; name: string; desc: string; sampleColor: string }[] = [
@@ -37,7 +40,12 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
   ];
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[400px] max-w-full bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dynamic-captions-title"
+      className="fixed inset-y-0 right-0 w-full sm:w-[400px] max-w-full bg-[#121622] border-l border-white/[0.1] shadow-2xl z-50 flex flex-col font-sans animate-in slide-in-from-right duration-200 pt-safe pb-safe"
+    >
       {/* Header */}
       <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#161b2a]">
         <div className="flex items-center gap-2.5">
@@ -46,7 +54,7 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-white">Dynamic Captions Studio</span>
+              <h3 id="dynamic-captions-title" className="font-bold text-sm text-white">Dynamic Captions Studio</h3>
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">
                 Active
               </span>
@@ -56,7 +64,8 @@ export const DynamicCaptionsStudio: React.FC<DynamicCaptionsStudioProps> = ({
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+          aria-label="Close Dynamic Captions Studio"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>

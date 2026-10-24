@@ -202,7 +202,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header with iOS Safe Area support */}
         <header className="pt-safe border-b border-white/[0.08] bg-[#10141f] shrink-0 z-20">
           <div className="h-16 px-4 sm:px-8 flex items-center justify-between gap-3">
@@ -413,9 +413,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* New Project Modal */}
       {isNewProjectModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <h2 className="text-lg font-bold text-white mb-1">Create New Project</h2>
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsNewProjectModalOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-project-title"
+            className="w-full max-w-md bg-[#141824] border border-white/[0.1] rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150"
+          >
+            <h2 id="new-project-title" className="text-lg font-bold text-white mb-1">Create New Project</h2>
             <p className="text-xs text-slate-400 mb-5">Start with a blank canvas or import media.</p>
 
             <form onSubmit={handleCreate} className="space-y-4">

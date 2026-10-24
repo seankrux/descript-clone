@@ -71,7 +71,7 @@ export const EmbedViewway: React.FC<EmbedViewwayProps> = ({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row h-screen w-screen bg-[#0d1017] text-white font-sans overflow-hidden select-none">
+    <main id="main-content" tabIndex={-1} className="flex flex-col sm:flex-row h-screen w-screen bg-[#0d1017] text-white font-sans overflow-hidden select-none">
       {/* Video Viewport */}
       <div className="flex-1 flex flex-col relative bg-black justify-center items-center overflow-hidden">
         {/* Top Header Overlay */}
@@ -206,6 +206,6 @@ export const EmbedViewway: React.FC<EmbedViewwayProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 };

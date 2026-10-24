@@ -963,7 +963,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
           </div>
 
           {/* Transcript Document View (Strictly Chronological Speaker Turns) */}
-          <div className="flex-1 overflow-y-auto ios-scroll p-4 sm:p-8 space-y-6 text-sm leading-relaxed font-sans relative pb-[calc(env(safe-area-inset-bottom)+40px)]">
+          <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto ios-scroll p-4 sm:p-8 space-y-6 text-sm leading-relaxed font-sans relative pb-[calc(env(safe-area-inset-bottom)+40px)]">
             {/* Floating Word Action Toolbar on Word Selection */}
             {selectedWord && (
               <div className="sticky top-0 z-30 mb-4 p-2 sm:p-2.5 rounded-2xl ios-glass border border-indigo-500/40 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
@@ -1187,7 +1187,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                 ))}
               </div>
             </div>
-          </div>
+          </main>
         </div>
 
         {/* Video Canvas & Preview (Order 1 on Mobile, Order 2 on Desktop) */}

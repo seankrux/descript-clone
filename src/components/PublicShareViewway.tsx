@@ -388,7 +388,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
       </header>
 
       {/* Main Presentation Layout (Split: Video Player Left, Interactive Transcript Right) */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <main id="main-content" tabIndex={-1} className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Video Stage Area */}
         <div className="w-full lg:flex-1 flex flex-col bg-black/60 items-center justify-center p-3 sm:p-6 relative shrink-0 border-b lg:border-b-0 border-white/[0.08]">
           <div
@@ -752,7 +752,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
             </form>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 };

@@ -19,6 +19,7 @@ import {
   Radio
 } from 'lucide-react';
 import { Project, ShareSettings, ShareAccessLevel } from '../types';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -60,6 +61,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       accentColor: '#6366f1',
     },
   };
+
+  const { handleBackdropClick } = useModalDismiss(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -110,8 +113,16 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-2xl bg-[#141824] border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div
+      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-modal-title"
+        className="w-full max-w-2xl bg-[#141824] border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-[#121622]">
           <div className="flex items-center gap-2.5">
@@ -119,7 +130,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight">
+              <h2 id="share-modal-title" className="text-base font-bold text-white tracking-tight">
                 Publish & Share Project
               </h2>
               <p className="text-xs text-slate-400">
@@ -130,6 +141,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
           <button
             onClick={onClose}
+            aria-label="Close Share Modal"
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
