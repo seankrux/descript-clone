@@ -39,6 +39,7 @@ interface DashboardViewProps {
   onImportMedia?: (file: File) => void;
   onSaveRecording?: (videoUrl: string, title: string) => void;
   onOpenPublicViewway?: (projectId: string) => void;
+  onResetToDemo?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -50,6 +51,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onImportMedia,
   onSaveRecording,
   onOpenPublicViewway,
+  onResetToDemo,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all');
@@ -143,6 +145,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Trash2 className="w-4 h-4 text-slate-400" />
               <span>Trash</span>
             </button>
+            {onResetToDemo && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Reset all projects back to factory sample demo state?')) {
+                    onResetToDemo();
+                  }
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-950/20 transition-colors"
+                title="Reset local storage and reload sample projects"
+              >
+                <Radio className="w-4 h-4 text-amber-400" />
+                <span>Reset Demo Data</span>
+              </button>
+            )}
           </nav>
         </div>
 

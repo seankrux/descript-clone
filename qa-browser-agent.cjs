@@ -86,15 +86,57 @@ async function runBrowserAgentQA() {
     assert(highlightedWords.length > 0, `Search highlighted ${highlightedWords.length} matches`);
     await searchInput.fill(''); // clear search
 
-    // Test clicking a word token to seek video
+    // Test clicking a word token to seek video and open floating toolbar
     const targetWord = await page.$('text=production.');
     if (targetWord) {
       await targetWord.click();
       await page.waitForTimeout(300);
       assert(true, 'Clicked transcript word "production." to trigger playhead seek');
+
+      // Verify Floating Word Action Toolbar appeared
+      const correctBtn = await page.$('button:has-text("Correct")');
+      assert(correctBtn !== null, 'Floating word action toolbar appeared with "Correct" button');
+
+      // Test Inline Word Text Correction
+      await correctBtn.click();
+      await page.waitForTimeout(200);
+      const inlineInput = await page.$('.space-y-4 input[type="text"], .flex-wrap input[type="text"]');
+      assert(inlineInput !== null, 'Inline word editor input rendered');
+      if (inlineInput) {
+        await inlineInput.fill('production-grade');
+        await inlineInput.press('Enter');
+        await page.waitForTimeout(300);
+        assert(true, 'Committed corrected word text via Enter key');
+
+        const updatedWord = await page.$('text=production-grade');
+        assert(updatedWord !== null, 'Corrected word "production-grade" rendered in transcript');
+      }
+
+      // Test Word Cutting (Delete)
+      const cutBtn = await page.$('button:has-text("Cut")');
+      if (cutBtn) {
+        await cutBtn.click();
+        await page.waitForTimeout(300);
+        assert(true, 'Cut word from video via floating toolbar');
+      }
+
+      // Test Word Restoration
+      const restoreBtn = await page.$('button:has-text("Restore")');
+      if (restoreBtn) {
+        await restoreBtn.click();
+        await page.waitForTimeout(300);
+        assert(true, 'Restored cut word back to video timeline');
+      }
     }
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '02_editor_workspace.png') });
+
+    // Test LocalStorage Persistence across Page Reload
+    console.log('\n--- 2b. Testing LocalStorage Transcript Persistence across Reload ---');
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('text=Document Script', { timeout: 5000 });
+    const persistedWord = await page.$('text=production-grade');
+    assert(persistedWord !== null, 'Corrected word "production-grade" persisted across page reload via localStorage');
 
     // -------------------------------------------------------------
     // 3. UNDERLORD AI COPILOT QA

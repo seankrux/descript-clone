@@ -30,7 +30,8 @@ import {
   Plus,
   RefreshCw,
   Search,
-  EyeOff
+  EyeOff,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -177,6 +178,45 @@ export const EditorView: React.FC<EditorViewProps> = ({
     project.scenes[0]?.words || []
   );
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
+  const [editingWordId, setEditingWordId] = useState<string | null>(null);
+  const [editingWordText, setEditingWordText] = useState('');
+
+  // Auto-sync project mutations to parent App container and localStorage
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    onUpdateProject({
+      ...project,
+      aspectRatio,
+      duration,
+      scenes: [
+        {
+          ...project.scenes[0],
+          words,
+        },
+        ...project.scenes.slice(1),
+      ],
+      studioSound,
+      eyeContact,
+      captions,
+      tracks,
+      multicamAngles,
+      comments,
+    });
+  }, [
+    words,
+    studioSound,
+    eyeContact,
+    captions,
+    tracks,
+    multicamAngles,
+    comments,
+    aspectRatio,
+    duration,
+  ]);
 
   // Video Ref & Audio DSP Engine
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -275,9 +315,13 @@ export const EditorView: React.FC<EditorViewProps> = ({
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlay();
-      } else if (e.code === 'Backspace' && selectedWordId) {
+      } else if ((e.code === 'Backspace' || e.code === 'Delete') && selectedWordId) {
         e.preventDefault();
         deleteWord(selectedWordId);
+      } else if (e.key.toLowerCase() === 'c' && selectedWordId) {
+        e.preventDefault();
+        const target = words.find((w) => w.id === selectedWordId);
+        if (target) handleStartInlineEdit(target);
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsUnderlordOpen(true);
@@ -289,7 +333,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedWordId, isPlaying, currentTime, tracks]);
+  }, [selectedWordId, isPlaying, currentTime, tracks, words]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -318,6 +362,24 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const handleWordClick = (word: WordToken) => {
     setSelectedWordId(word.id);
     seekTo(word.start);
+  };
+
+  const handleStartInlineEdit = (word: WordToken) => {
+    setEditingWordId(word.id);
+    setEditingWordText(word.text);
+  };
+
+  const handleSaveInlineEdit = () => {
+    if (!editingWordId || !editingWordText.trim()) {
+      setEditingWordId(null);
+      return;
+    }
+    const trimmed = editingWordText.trim();
+    setWords((prev) =>
+      prev.map((w) => (w.id === editingWordId ? { ...w, text: trimmed } : w))
+    );
+    addToast('success', 'Transcript Corrected', `Updated text to "${trimmed}".`);
+    setEditingWordId(null);
   };
 
   const deleteWord = (wordId: string) => {
@@ -516,6 +578,10 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
   // Active word token calculation
   const activeWords = words.filter((w) => !w.deleted);
+  const selectedWord = useMemo(
+    () => words.find((w) => w.id === selectedWordId),
+    [words, selectedWordId]
+  );
   const currentActiveWord = activeWords.find(
     (w) => currentTime >= w.start && currentTime <= w.end
   );
@@ -782,7 +848,101 @@ export const EditorView: React.FC<EditorViewProps> = ({
           </div>
 
           {/* Transcript Document View (Strictly Chronological Speaker Turns) */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-6 text-sm leading-relaxed font-sans">
+          <div className="flex-1 overflow-y-auto p-8 space-y-6 text-sm leading-relaxed font-sans relative">
+            {/* Floating Word Action Toolbar on Word Selection */}
+            {selectedWord && (
+              <div className="sticky top-0 z-30 mb-4 p-2.5 rounded-xl bg-[#181f30] border border-indigo-500/40 shadow-xl shadow-black/60 flex items-center justify-between gap-3 text-xs backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800">
+                    {formatTime(selectedWord.start)}
+                  </span>
+                  <span className="font-bold text-white max-w-[140px] truncate">
+                    "{selectedWord.text}"
+                  </span>
+                  {selectedWord.deleted && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono">
+                      Cut
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleStartInlineEdit(selectedWord)}
+                    className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Correct spelling without altering audio (C)"
+                  >
+                    <Type className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Correct</span>
+                  </button>
+
+                  {selectedWord.deleted ? (
+                    <button
+                      onClick={() => restoreWord(selectedWord.id)}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer"
+                      title="Restore cut segment into video"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Restore</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => deleteWord(selectedWord.id)}
+                      className="px-2.5 py-1 rounded-lg bg-rose-600/25 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer"
+                      title="Cut word from video & skip playback (Delete / Backspace)"
+                    >
+                      <Scissors className="w-3.5 h-3.5" />
+                      <span>Cut</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      seekTo(selectedWord.start);
+                      if (videoRef.current) {
+                        videoRef.current.play();
+                        setIsPlaying(true);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30"
+                    title="Play video from this word"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Play</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsVoiceCloningOpen(true)}
+                    className="px-2.5 py-1 rounded-lg bg-purple-600/25 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer"
+                    title="Synthesize AI voice replacement"
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Overdub</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCurrentTime(selectedWord.start);
+                      setIsCommentsOpen(true);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Leave comment at this word timestamp"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Comment</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedWordId(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1"
+                    title="Close selection"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Scene Header */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -817,6 +977,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                     <div className="flex flex-wrap gap-1.5 text-slate-200 text-sm">
                       {turn.words.map((word) => {
                         const isSelected = selectedWordId === word.id;
+                        const isEditing = editingWordId === word.id;
                         const isCurrentlyPlaying =
                           currentTime >= word.start && currentTime <= word.end;
                         const matchesSearch =
@@ -825,10 +986,48 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
                         if (word.deleted && !showDeletedWords) return null;
 
+                        if (isEditing) {
+                          return (
+                            <span
+                              key={word.id}
+                              className="inline-flex items-center gap-1 my-[-2px]"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingWordText}
+                                onChange={(e) => setEditingWordText(e.target.value)}
+                                onBlur={handleSaveInlineEdit}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveInlineEdit();
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    setEditingWordId(null);
+                                  }
+                                }}
+                                className="px-1.5 py-0.5 rounded bg-indigo-950 border-2 border-indigo-400 text-white font-bold text-xs outline-none w-28 shadow-lg shadow-indigo-600/50"
+                              />
+                              <button
+                                onClick={handleSaveInlineEdit}
+                                className="p-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] cursor-pointer"
+                                title="Save text"
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                            </span>
+                          );
+                        }
+
                         return (
                           <span
                             key={word.id}
+                            id={`word-${word.id}`}
                             onClick={() => handleWordClick(word)}
+                            onDoubleClick={() => handleStartInlineEdit(word)}
+                            title="Click to seek • Double-click to correct text • Backspace to cut"
                             className={`px-1.5 py-0.5 rounded cursor-pointer transition-all inline-flex items-center gap-1 ${
                               word.deleted
                                 ? 'line-through text-red-400/60 bg-red-950/20'

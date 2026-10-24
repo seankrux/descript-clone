@@ -11,9 +11,26 @@ import {
   createProjectFromRecording 
 } from './utils/extensionBridge';
 
+const STORAGE_KEY = 'descript_projects_v2';
+
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Default to logged-in so user experiences workspace immediately
-  const [projects, setProjects] = useState<Project[]>(SAMPLE_PROJECTS);
+  const [projects, setProjects] = useState<Project[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load projects from localStorage:', e);
+      }
+    }
+    return SAMPLE_PROJECTS;
+  });
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [viewwayConfig, setViewwayConfig] = useState<{
     mode: 'share' | 'embed' | 'review' | null;
@@ -22,14 +39,26 @@ export const App: React.FC = () => {
 
   const bridgeRef = useRef<ExtensionSyncBridge | null>(null);
 
+  // Sync projects to localStorage whenever updated
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+      } catch (e) {
+        console.warn('Failed to save projects to localStorage:', e);
+      }
+    }
+  }, [projects]);
+
   // Initialize Chrome Extension companion sync listener & URL auto-importer
   useEffect(() => {
-    // 0. Check URL query parameters for public viewways (?share=, ?embed=, ?review=)
+    // 0. Check URL query parameters for public viewways and active project
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const shareParam = searchParams.get('share');
       const embedParam = searchParams.get('embed');
       const reviewParam = searchParams.get('review');
+      const projectParam = searchParams.get('project');
 
       if (embedParam) {
         setViewwayConfig({ mode: 'embed', projectId: embedParam });
@@ -37,6 +66,8 @@ export const App: React.FC = () => {
         setViewwayConfig({ mode: 'review', projectId: reviewParam });
       } else if (shareParam) {
         setViewwayConfig({ mode: 'share', projectId: shareParam });
+      } else if (projectParam) {
+        setActiveProjectId(projectParam);
       }
     }
 
@@ -52,7 +83,7 @@ export const App: React.FC = () => {
         urlPayload.duration
       );
       setProjects((prev) => [newProj, ...prev]);
-      setActiveProjectId(newProj.id);
+      handleOpenProject(newProj.id);
     }
 
     // 2. Subscribe to live BroadcastChannel / postMessage recordings
@@ -63,13 +94,24 @@ export const App: React.FC = () => {
         payload.duration
       );
       setProjects((prev) => [newProj, ...prev]);
-      setActiveProjectId(newProj.id);
+      handleOpenProject(newProj.id);
     });
 
     return () => {
       bridge.destroy();
     };
   }, []);
+
+  const handleOpenProject = (id: string | null) => {
+    setActiveProjectId(id);
+    if (typeof window !== 'undefined') {
+      if (id) {
+        window.history.replaceState({}, '', `/?project=${id}`);
+      } else {
+        window.history.replaceState({}, '', '/');
+      }
+    }
+  };
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
@@ -134,32 +176,63 @@ export const App: React.FC = () => {
     };
 
     setProjects([newProj, ...projects]);
-    setActiveProjectId(newProj.id);
+    handleOpenProject(newProj.id);
   };
 
   const handleImportMedia = (file: File) => {
     const fileUrl = URL.createObjectURL(file);
     const title = file.name.replace(/\.[^/.]+$/, '') || 'Imported Media';
-    const newProj = createProjectFromRecording(title, fileUrl, 21.6);
-    setProjects([newProj, ...projects]);
-    setActiveProjectId(newProj.id);
+    const isVideo = file.type.startsWith('video') || /\.(mp4|mov|webm|m4v)$/i.test(file.name);
+
+    if (typeof document !== 'undefined') {
+      const tempMedia = document.createElement(isVideo ? 'video' : 'audio');
+      tempMedia.preload = 'metadata';
+      tempMedia.src = fileUrl;
+
+      const finishCreate = (dur: number) => {
+        const safeDuration = dur && !isNaN(dur) && isFinite(dur) ? Math.round(dur * 10) / 10 : 21.6;
+        const newProj = createProjectFromRecording(title, fileUrl, safeDuration);
+        newProj.type = isVideo ? 'video' : 'audio';
+        setProjects((prev) => [newProj, ...prev]);
+        handleOpenProject(newProj.id);
+      };
+
+      tempMedia.onloadedmetadata = () => finishCreate(tempMedia.duration);
+      tempMedia.onerror = () => finishCreate(21.6);
+    } else {
+      const newProj = createProjectFromRecording(title, fileUrl, 21.6);
+      newProj.type = isVideo ? 'video' : 'audio';
+      setProjects((prev) => [newProj, ...prev]);
+      handleOpenProject(newProj.id);
+    }
   };
 
   const handleSaveRecording = (videoUrl: string, title: string) => {
     const newProj = createProjectFromRecording(title, videoUrl, 18.0);
     setProjects([newProj, ...projects]);
-    setActiveProjectId(newProj.id);
+    handleOpenProject(newProj.id);
   };
 
   const handleDeleteProject = (projectId: string) => {
     setProjects(projects.filter((p) => p.id !== projectId));
     if (activeProjectId === projectId) {
-      setActiveProjectId(null);
+      handleOpenProject(null);
     }
   };
 
   const handleUpdateProject = (updated: Project) => {
     setProjects(projects.map((p) => (p.id === updated.id ? updated : p)));
+  };
+
+  const handleResetToDemo = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.warn('Failed to clear localStorage:', e);
+      }
+    }
+    setProjects(SAMPLE_PROJECTS);
   };
 
   // 1. Direct Embed Viewway Mode (?embed=proj-1)
@@ -213,7 +286,7 @@ export const App: React.FC = () => {
     return (
       <EditorView
         project={activeProject}
-        onBack={() => setActiveProjectId(null)}
+        onBack={() => handleOpenProject(null)}
         onUpdateProject={handleUpdateProject}
       />
     );
@@ -223,12 +296,13 @@ export const App: React.FC = () => {
   return (
     <DashboardView
       projects={projects}
-      onOpenProject={(id) => setActiveProjectId(id)}
+      onOpenProject={(id) => handleOpenProject(id)}
       onCreateProject={handleCreateProject}
       onDeleteProject={handleDeleteProject}
       onLogout={() => setIsAuthenticated(false)}
       onImportMedia={handleImportMedia}
       onSaveRecording={handleSaveRecording}
+      onResetToDemo={handleResetToDemo}
       onOpenPublicViewway={(id) => {
         setViewwayConfig({ mode: 'share', projectId: id });
         if (typeof window !== 'undefined') {
