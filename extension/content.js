@@ -236,65 +236,81 @@
 
     document.getElementById('descript-open-studio-btn').addEventListener('click', () => {
       const title = `Extension Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      
-      // 1. Broadcast to open Descript tabs and pass raw Blob (avoiding cross-origin blob: URL)
-      try {
-        if ('BroadcastChannel' in window) {
-          const channel = new BroadcastChannel('descript_companion_sync');
-          channel.postMessage({
-            type: 'RECORDING_COMPLETED',
-            payload: {
-              title,
-              videoUrl: '',
-              videoBlob: blob,
-              mimeType: 'video/webm',
-              duration: elapsedSeconds || 15,
-              timestamp: Date.now(),
-              mode: currentConfig ? currentConfig.mode : 'screen-cam',
-            },
-          });
-          setTimeout(() => {
-            try { channel.close(); } catch {}
-          }, 500);
-        }
-      } catch (e) {
-        console.warn('Broadcast sync error:', e);
-      }
+      const durationVal = elapsedSeconds || 15;
+      const modeVal = currentConfig ? currentConfig.mode : 'screen-cam';
 
-      // 2. Open Descript Web Studio with query parameters for direct auto-import
-      const targetUrl = new URL(studioUrl);
-      targetUrl.searchParams.set('import_recording', 'true');
-      targetUrl.searchParams.set('title', title);
-      targetUrl.searchParams.set('duration', (elapsedSeconds || 15).toString());
+      const dispatchToStudio = (videoDataUrl) => {
+        const payload = {
+          title,
+          videoUrl: videoDataUrl || '',
+          videoBlob: blob,
+          videoDataUrl: videoDataUrl || undefined,
+          mimeType: 'video/webm',
+          duration: durationVal,
+          timestamp: Date.now(),
+          mode: modeVal,
+        };
 
-      const openedWin = window.open(targetUrl.toString(), '_blank');
-      
-      // 3. PostMessage raw Blob once opened so Studio creates its own origin ObjectURL
-      if (openedWin) {
-        setTimeout(() => {
-          try {
-            openedWin.postMessage(
-              {
-                type: 'DESCRIPT_EXTENSION_RECORDING',
-                payload: {
-                  title,
-                  videoUrl: '',
-                  videoBlob: blob,
-                  mimeType: 'video/webm',
-                  duration: elapsedSeconds || 15,
-                  timestamp: Date.now(),
-                  mode: currentConfig ? currentConfig.mode : 'screen-cam',
-                },
-              },
-              targetUrl.origin
-            );
-          } catch (postErr) {
-            console.warn('postMessage to studio tab failed:', postErr);
+        // 1. Broadcast to open Descript tabs (same-origin contexts)
+        try {
+          if ('BroadcastChannel' in window) {
+            const channel = new BroadcastChannel('descript_companion_sync');
+            channel.postMessage({
+              type: 'RECORDING_COMPLETED',
+              payload,
+            });
+            setTimeout(() => {
+              try { channel.close(); } catch {}
+            }, 500);
           }
-        }, 1200);
+        } catch (e) {
+          console.warn('Broadcast sync error:', e);
+        }
+
+        // 2. Open Descript Web Studio with query parameters for direct auto-import
+        const targetUrl = new URL(studioUrl);
+        targetUrl.searchParams.set('import_recording', 'true');
+        targetUrl.searchParams.set('title', title);
+        targetUrl.searchParams.set('duration', durationVal.toString());
+
+        const openedWin = window.open(targetUrl.toString(), '_blank');
+
+        // 3. PostMessage raw Blob + base64 data URL once opened so Studio creates its own origin ObjectURL
+        if (openedWin) {
+          setTimeout(() => {
+            try {
+              openedWin.postMessage(
+                {
+                  type: 'DESCRIPT_EXTENSION_RECORDING',
+                  payload,
+                },
+                targetUrl.origin
+              );
+            } catch (postErr) {
+              console.warn('postMessage to studio tab failed:', postErr);
+            }
+          }, 1200);
+        }
+
+        modalEl.remove();
+      };
+
+      // Convert blobs <= 15MB to base64 data URL for guaranteed cross-origin transfer
+      if (blob && blob.size <= 15 * 1024 * 1024 && typeof FileReader !== 'undefined') {
+        try {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            dispatchToStudio(typeof reader.result === 'string' ? reader.result : '');
+          };
+          reader.onerror = () => dispatchToStudio('');
+          reader.readAsDataURL(blob);
+          return;
+        } catch {
+          // Fallback to direct Blob transfer
+        }
       }
 
-      modalEl.remove();
+      dispatchToStudio('');
     });
   }
 

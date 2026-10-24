@@ -81,6 +81,7 @@ export const App: React.FC = () => {
     bridgeRef.current = bridge;
 
     // 1. Check if opened with recording parameters from the extension
+    let pendingUrlImportId: string | null = null;
     const urlPayload = bridge.checkForUrlParams();
     if (urlPayload) {
       const newProj = createProjectFromRecording(
@@ -88,6 +89,7 @@ export const App: React.FC = () => {
         urlPayload.videoUrl,
         urlPayload.duration
       );
+      pendingUrlImportId = newProj.id;
       setProjects((prev) => [newProj, ...prev]);
       handleOpenProject(newProj.id);
     }
@@ -97,10 +99,20 @@ export const App: React.FC = () => {
       const newProj = createProjectFromRecording(
         payload.title,
         payload.videoUrl,
-        payload.duration
+        payload.duration,
+        payload.transcriptText
       );
-      setProjects((prev) => [newProj, ...prev]);
-      handleOpenProject(newProj.id);
+      if (pendingUrlImportId) {
+        const targetId = pendingUrlImportId;
+        pendingUrlImportId = null;
+        setProjects((prev) =>
+          prev.map((p) => (p.id === targetId ? { ...newProj, id: targetId } : p))
+        );
+        handleOpenProject(targetId);
+      } else {
+        setProjects((prev) => [newProj, ...prev]);
+        handleOpenProject(newProj.id);
+      }
     });
 
     return () => {

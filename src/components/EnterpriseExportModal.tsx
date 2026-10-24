@@ -26,7 +26,8 @@ import {
   generatePremiereXML, 
   generateFCPXML, 
   generateEDL,
-  generateTrimmedWavBlob
+  generateTrimmedWavBlob,
+  generateTrimmedWavFromMedia
 } from '../utils/exportGenerators';
 
 const YouTubeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -111,9 +112,10 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
     }, 350);
   };
 
-  const handleDownloadTrimmedWav = () => {
-    const wavBlob = generateTrimmedWavBlob(words, project.silenceSkipRanges);
-    const url = URL.createObjectURL(wavBlob.blob);
+  const handleDownloadTrimmedWav = async () => {
+    const videoUrl = project.scenes[0]?.videoClipUrl || '/sample-studio.mp4';
+    const wavResult = await generateTrimmedWavFromMedia(videoUrl, words, project.silenceSkipRanges);
+    const url = URL.createObjectURL(wavResult.blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${project.title.toLowerCase().replace(/\s+/g, '-')}-edited-master.wav`;
@@ -124,7 +126,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
     if (onNotify) {
       onNotify(
         'Edited WAV Master Downloaded',
-        `Synthesized ${activeWordCount} active words (${cutWordCount} deleted words omitted).`
+        `Exported ${wavResult.activeWordCount} active words (${cutWordCount} deleted words omitted, ${wavResult.durationSec}s).`
       );
     }
   };
@@ -281,9 +283,12 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
 
               {/* Toggles */}
               <div className="space-y-2">
-                <div
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.burnCaptions}
                   onClick={() => setSettings({ ...settings, burnCaptions: !settings.burnCaptions })}
-                  className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                  className={`w-full text-left p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
                     settings.burnCaptions ? 'bg-indigo-950/30 border-indigo-500/40' : 'bg-white/[0.02] border-white/[0.06]'
                   }`}
                 >
@@ -292,11 +297,14 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                     <span className="text-[11px] text-slate-400">Embeds viral bouncing karaoke subtitles into frames</span>
                   </div>
                   {settings.burnCaptions && <Check className="w-4 h-4 text-indigo-400" />}
-                </div>
+                </button>
 
-                <div
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.includeStudioSound}
                   onClick={() => setSettings({ ...settings, includeStudioSound: !settings.includeStudioSound })}
-                  className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                  className={`w-full text-left p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
                     settings.includeStudioSound ? 'bg-emerald-950/30 border-emerald-500/40' : 'bg-white/[0.02] border-white/[0.06]'
                   }`}
                 >
@@ -305,7 +313,7 @@ export const EnterpriseExportModal: React.FC<EnterpriseExportModalProps> = ({
                     <span className="text-[11px] text-slate-400">Renders noise-canceled, echo-reduced vocal master</span>
                   </div>
                   {settings.includeStudioSound && <Check className="w-4 h-4 text-emerald-400" />}
-                </div>
+                </button>
               </div>
 
               {/* Rendering Progress or Action Button */}

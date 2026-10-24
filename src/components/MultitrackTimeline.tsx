@@ -199,7 +199,9 @@ export const MultitrackTimeline: React.FC<MultitrackTimelineProps> = ({
               {Array.from({ length: Math.ceil(duration / 2) + 1 }).map((_, i) => (
                 <div
                   key={i}
-                  className="absolute top-0 bottom-0 border-l border-white/[0.08] pl-1 pt-0.5"
+                  className={`absolute top-0 bottom-0 border-l border-white/[0.08] pl-1 pt-0.5 ${
+                    i % 2 === 1 ? 'hidden sm:block' : ''
+                  }`}
                   style={{ left: `${((i * 2) / duration) * 100}%` }}
                 >
                   {i * 2}s

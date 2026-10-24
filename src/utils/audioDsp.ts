@@ -20,9 +20,23 @@ export class StudioAudioEngine {
   private analyser: AnalyserNode | null = null;
   private currentElement: HTMLMediaElement | null = null;
   private isInitialized = false;
+  private pendingDestroyTimer: ReturnType<typeof setTimeout> | null = null;
 
   public init(mediaElement: HTMLMediaElement): boolean {
-    if (this.isInitialized && this.currentElement === mediaElement) return true;
+    if (this.pendingDestroyTimer) {
+      clearTimeout(this.pendingDestroyTimer);
+      this.pendingDestroyTimer = null;
+    }
+
+    if (this.isInitialized && this.currentElement === mediaElement && this.audioCtx && this.audioCtx.state !== 'closed') {
+      return true;
+    }
+
+    if (this.audioCtx && this.currentElement !== mediaElement) {
+      this.audioCtx.close().catch(() => {});
+      this.audioCtx = null;
+      this.isInitialized = false;
+    }
 
     try {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -39,10 +53,10 @@ export class StudioAudioEngine {
       // Create nodes
       this.sourceNode = this.audioCtx.createMediaElementSource(mediaElement);
 
-      // 1. High-pass filter (80Hz cut to eliminate mic handling and wind rumble)
+      // 1. High-pass filter (40Hz sub-bass cut so 60Hz mains hum notch remains in passband)
       this.highpassFilter = this.audioCtx.createBiquadFilter();
       this.highpassFilter.type = 'highpass';
-      this.highpassFilter.frequency.value = 80;
+      this.highpassFilter.frequency.value = 40;
 
       // 2. Peaking filter for 60Hz hum suppression with precise dB attenuation
       this.humNotchFilter = this.audioCtx.createBiquadFilter();
@@ -160,12 +174,26 @@ export class StudioAudioEngine {
   }
 
   public destroy() {
-    if (this.audioCtx) {
-      this.audioCtx.close().catch(() => {});
-      this.audioCtx = null;
-      this.analyser = null;
-      this.currentElement = null;
-      this.isInitialized = false;
+    if (this.pendingDestroyTimer) {
+      clearTimeout(this.pendingDestroyTimer);
     }
+    this.pendingDestroyTimer = setTimeout(() => {
+      this.pendingDestroyTimer = null;
+      if (this.audioCtx) {
+        try {
+          this.sourceNode?.disconnect();
+          this.masterGain?.disconnect();
+          this.analyser?.disconnect();
+        } catch {
+          // ignore disconnect errors on already-closed nodes
+        }
+        this.audioCtx.close().catch(() => {});
+        this.audioCtx = null;
+        this.sourceNode = null;
+        this.analyser = null;
+        this.currentElement = null;
+        this.isInitialized = false;
+      }
+    }, 50);
   }
 }

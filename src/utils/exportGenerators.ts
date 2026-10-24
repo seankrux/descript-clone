@@ -352,6 +352,52 @@ export function computeNonDestructiveSkipTarget(
 }
 
 /**
+ * Computes the non-deleted, non-silence-skipped playable time segments from words and silenceSkipRanges.
+ */
+export function computeActiveAudioSegments(
+  words: WordToken[],
+  silenceSkipRanges: Array<{ start: number; end: number }> = []
+): Array<{ start: number; end: number; speaker?: string }> {
+  const activeWords = words.filter((w) => !w.deleted);
+  if (activeWords.length === 0) return [];
+
+  const segments: Array<{ start: number; end: number; speaker?: string }> = [];
+
+  for (let i = 0; i < activeWords.length; i++) {
+    const w = activeWords[i];
+    const segStart = w.start;
+    let segEnd = w.end;
+
+    // Include natural un-skipped pause up to the next word if the next word in the original transcript was not deleted
+    const nextActive = activeWords[i + 1];
+    if (nextActive && nextActive.start > segEnd) {
+      const gapStart = segEnd;
+      const gapEnd = nextActive.start;
+      const hasDeletedBetween = words.some(
+        (cand) => cand.deleted && cand.start >= gapStart - 0.01 && cand.end <= gapEnd + 0.01
+      );
+      if (!hasDeletedBetween) {
+        // Subtract any shortened silence skip range inside [gapStart, gapEnd]
+        const matchingSkip = silenceSkipRanges.find(
+          (s) => s.start >= gapStart - 0.02 && s.end <= gapEnd + 0.02
+        );
+        if (matchingSkip) {
+          segEnd = Math.max(segEnd, matchingSkip.start);
+        } else {
+          segEnd = gapEnd;
+        }
+      }
+    }
+
+    if (segEnd > segStart) {
+      segments.push({ start: segStart, end: segEnd, speaker: w.speaker });
+    }
+  }
+
+  return segments;
+}
+
+/**
  * Generates a real downloadable RIFF WAVE (.wav) PCM 16-bit audio master reflecting ONLY non-deleted words
  * and shortened silences.
  */
@@ -361,13 +407,13 @@ export function generateTrimmedWavBlob(
 ): { blob: Blob; durationSec: number; activeWordCount: number } {
   const activeWords = words.filter((w) => !w.deleted);
   const sampleRate = 22050; // 22.05kHz mono PCM for fast, lightweight browser master generation
-  const savedSilence = silenceSkipRanges.reduce((acc, r) => acc + Math.max(0, r.end - r.start), 0);
+  const segments = computeActiveAudioSegments(words, silenceSkipRanges);
 
-  const totalWordDuration = activeWords.reduce(
-    (acc, w) => acc + Math.max(0.08, w.end - w.start),
+  const totalSegmentDuration = segments.reduce(
+    (acc, seg) => acc + Math.max(0.04, seg.end - seg.start),
     0
   );
-  const durationSec = Math.max(1.0, Number((totalWordDuration + Math.max(0, 0.5 - savedSilence * 0.05)).toFixed(2)));
+  const durationSec = Math.max(0.5, Number(totalSegmentDuration.toFixed(2)));
   const numSamples = Math.floor(durationSec * sampleRate);
   const buffer = new ArrayBuffer(44 + numSamples * 2);
   const view = new DataView(buffer);
@@ -393,17 +439,17 @@ export function generateTrimmedWavBlob(
   writeString(36, 'data');
   view.setUint32(40, numSamples * 2, true);
 
-  // Synthesize speech-cadence harmonic envelope per active word token
+  // Synthesize speech-cadence harmonic envelope per active segment
   let sampleCursor = 0;
-  for (let wIdx = 0; wIdx < activeWords.length; wIdx++) {
-    const word = activeWords[wIdx];
-    const wordDur = Math.max(0.08, word.end - word.start);
-    const wordSamples = Math.min(numSamples - sampleCursor, Math.floor(wordDur * sampleRate));
-    const baseFreq = word.speaker === 'Sarah' ? 215 : 135;
+  for (let sIdx = 0; sIdx < segments.length; sIdx++) {
+    const seg = segments[sIdx];
+    const segDur = Math.max(0.04, seg.end - seg.start);
+    const segSamples = Math.min(numSamples - sampleCursor, Math.floor(segDur * sampleRate));
+    const baseFreq = seg.speaker === 'Sarah' ? 215 : 135;
 
-    for (let i = 0; i < wordSamples; i++) {
+    for (let i = 0; i < segSamples; i++) {
       const t = i / sampleRate;
-      const env = Math.sin((Math.PI * i) / Math.max(1, wordSamples)); // Smooth syllable envelope
+      const env = Math.sin((Math.PI * i) / Math.max(1, segSamples)); // Smooth syllable envelope
       const signal =
         0.55 * Math.sin(2 * Math.PI * baseFreq * t) +
         0.3 * Math.sin(2 * Math.PI * (baseFreq * 2) * t) +
@@ -411,7 +457,7 @@ export function generateTrimmedWavBlob(
       const pcmValue = Math.max(-1, Math.min(1, signal * env * 0.35));
       view.setInt16(44 + (sampleCursor + i) * 2, pcmValue * 32767, true);
     }
-    sampleCursor += wordSamples;
+    sampleCursor += segSamples;
   }
 
   return {
@@ -420,4 +466,105 @@ export function generateTrimmedWavBlob(
     activeWordCount: activeWords.length,
   };
 }
+
+/**
+ * Decodes real source media audio via Web Audio API and slices out deleted words and shortened silences
+ * into a 16-bit PCM RIFF WAVE (.wav) master. Falls back to `generateTrimmedWavBlob` if media fetch/decode fails.
+ */
+export async function generateTrimmedWavFromMedia(
+  videoUrl: string | undefined,
+  words: WordToken[],
+  silenceSkipRanges: Array<{ start: number; end: number }> = []
+): Promise<{ blob: Blob; durationSec: number; activeWordCount: number }> {
+  const activeWords = words.filter((w) => !w.deleted);
+  const segments = computeActiveAudioSegments(words, silenceSkipRanges);
+
+  if (!videoUrl || segments.length === 0 || typeof window === 'undefined') {
+    return generateTrimmedWavBlob(words, silenceSkipRanges);
+  }
+
+  try {
+    const AudioCtxClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtxClass) {
+      return generateTrimmedWavBlob(words, silenceSkipRanges);
+    }
+
+    const response = await fetch(videoUrl);
+    if (!response.ok) {
+      return generateTrimmedWavBlob(words, silenceSkipRanges);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const tempCtx = new AudioCtxClass();
+    try {
+      const audioBuffer = await tempCtx.decodeAudioData(arrayBuffer.slice(0));
+      const srcRate = audioBuffer.sampleRate;
+      const channelData = audioBuffer.getChannelData(0);
+      const totalMediaSamples = channelData.length;
+
+      // Compute sample slices within decoded audio buffer
+      const sampleSlices: Array<{ startSample: number; endSample: number }> = [];
+      let totalOutputSamples = 0;
+
+      for (const seg of segments) {
+        const clampedStart = Math.max(0, Math.min(audioBuffer.duration, seg.start));
+        const clampedEnd = Math.max(clampedStart, Math.min(audioBuffer.duration, seg.end));
+        const startSample = Math.floor(clampedStart * srcRate);
+        const endSample = Math.min(totalMediaSamples, Math.floor(clampedEnd * srcRate));
+        if (endSample > startSample) {
+          sampleSlices.push({ startSample, endSample });
+          totalOutputSamples += endSample - startSample;
+        }
+      }
+
+      if (totalOutputSamples === 0) {
+        return generateTrimmedWavBlob(words, silenceSkipRanges);
+      }
+
+      const wavBuffer = new ArrayBuffer(44 + totalOutputSamples * 2);
+      const view = new DataView(wavBuffer);
+      const writeString = (offset: number, str: string) => {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      };
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + totalOutputSamples * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, srcRate, true);
+      view.setUint32(28, srcRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, totalOutputSamples * 2, true);
+
+      let outOffset = 44;
+      for (const slice of sampleSlices) {
+        for (let s = slice.startSample; s < slice.endSample; s++) {
+          const sample = Math.max(-1, Math.min(1, channelData[s]));
+          view.setInt16(outOffset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+          outOffset += 2;
+        }
+      }
+
+      const durationSec = Number((totalOutputSamples / srcRate).toFixed(2));
+      return {
+        blob: new Blob([wavBuffer], { type: 'audio/wav' }),
+        durationSec,
+        activeWordCount: activeWords.length,
+      };
+    } finally {
+      tempCtx.close().catch(() => {});
+    }
+  } catch {
+    return generateTrimmedWavBlob(words, silenceSkipRanges);
+  }
+}
+
 

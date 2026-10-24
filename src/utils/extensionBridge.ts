@@ -10,11 +10,32 @@ export interface ExtensionRecordingPayload {
   title: string;
   videoUrl: string;
   videoBlob?: Blob | ArrayBuffer;
+  videoDataUrl?: string;
   mimeType?: string;
   transcriptText?: string;
   duration: number;
   timestamp: number;
   mode: string;
+}
+
+function dataUrlToBlobUrl(dataUrl: string): string | null {
+  try {
+    const commaIdx = dataUrl.indexOf(',');
+    if (commaIdx === -1) return null;
+    const header = dataUrl.slice(0, commaIdx);
+    const base64 = dataUrl.slice(commaIdx + 1);
+    const mimeMatch = header.match(/data:([^;]+)/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'video/webm';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
 }
 
 export class ExtensionSyncBridge {
@@ -71,7 +92,7 @@ export class ExtensionSyncBridge {
 
     let resolvedVideoUrl = typeof rawPayload.videoUrl === 'string' ? rawPayload.videoUrl : '';
 
-    // If cross-origin extension sent a raw Blob or ArrayBuffer, mint the blob: URL inside the Studio's own origin
+    // 1. If cross-origin extension sent a raw Blob or ArrayBuffer, mint the blob: URL inside the Studio's own origin
     if (rawPayload.videoBlob && typeof URL !== 'undefined' && URL.createObjectURL) {
       try {
         const blob =
@@ -81,6 +102,19 @@ export class ExtensionSyncBridge {
         resolvedVideoUrl = URL.createObjectURL(blob);
       } catch (err) {
         console.warn('Failed to create local object URL from extension blob:', err);
+      }
+    } else if (
+      (typeof rawPayload.videoDataUrl === 'string' && rawPayload.videoDataUrl.startsWith('data:')) ||
+      resolvedVideoUrl.startsWith('data:')
+    ) {
+      // 2. If cross-origin extension sent a base64 data: URL (up to 15MB), convert to a local blob: URL
+      const sourceDataUrl =
+        typeof rawPayload.videoDataUrl === 'string' && rawPayload.videoDataUrl.startsWith('data:')
+          ? rawPayload.videoDataUrl
+          : resolvedVideoUrl;
+      const converted = dataUrlToBlobUrl(sourceDataUrl);
+      if (converted) {
+        resolvedVideoUrl = converted;
       }
     }
 

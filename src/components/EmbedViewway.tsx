@@ -51,6 +51,23 @@ export const EmbedViewway: React.FC<EmbedViewwayProps> = ({
   const isLightTheme = embedConfig.theme === 'light';
   const accentColor = embedConfig.accentColor || '#6366f1';
 
+  // Parse ?t=<seconds> on mount so deep-linked embeds seek on load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tParam = params.get('t');
+      if (tParam !== null) {
+        const parsedTime = parseFloat(tParam);
+        if (!isNaN(parsedTime) && parsedTime >= 0) {
+          setCurrentTime(parsedTime);
+          if (videoRef.current) {
+            videoRef.current.currentTime = parsedTime;
+          }
+        }
+      }
+    }
+  }, []);
+
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {

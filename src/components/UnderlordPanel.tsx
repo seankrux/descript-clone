@@ -256,7 +256,7 @@ export const UnderlordPanel: React.FC<UnderlordPanelProps> = ({
                     <div className="text-xs font-medium text-white group-hover:text-indigo-300 transition-colors">
                       Shorten Wordless Gaps & Silences
                     </div>
-                    <div className="text-[11px] text-slate-400">Tightens pauses greater than 0.7s to 0.3s</div>
+                    <div className="text-[11px] text-slate-400">Non-destructively skips dead-air pauses between speech turns</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />

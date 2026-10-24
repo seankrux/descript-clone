@@ -145,10 +145,12 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
               {transitions.map((t) => {
                 const isSelected = selectedTransition === t.id;
                 return (
-                  <div
+                  <button
                     key={t.id}
+                    type="button"
+                    aria-pressed={isSelected}
                     onClick={() => onSelectTransition(t.id)}
-                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+                    className={`w-full text-left p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-amber-950/40 border-amber-500/60 text-white'
                         : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:border-white/20'
@@ -159,7 +161,7 @@ export const CanvasTransitionsModal: React.FC<CanvasTransitionsModalProps> = ({
                       <div className="text-[10px] text-slate-400">{t.desc}</div>
                     </div>
                     {isSelected && <Check className="w-4 h-4 text-amber-400" />}
-                  </div>
+                  </button>
                 );
               })}
             </div>

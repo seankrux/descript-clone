@@ -241,7 +241,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
       engine.updateConfig(studioSound);
     }
     return () => {
-      // Keep engine across re-renders
+      engine.destroy();
     };
   }, []);
 
@@ -411,7 +411,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   };
 
   const shortenSilences = () => {
-    // Non-destructive silence shortening: detect gaps between consecutive non-deleted words > 0.4s
+    // Non-destructive silence shortening: detect wordless pauses between consecutive active words >= 0.18s
     // Register skip ranges instead of mutating word timestamps!
     const activeWords = words.filter((w) => !w.deleted);
     const newSkipRanges: SilenceSkipRange[] = [];
@@ -422,8 +422,8 @@ export const EditorView: React.FC<EditorViewProps> = ({
       const next = activeWords[i + 1];
       const rawGap = next.start - current.end;
 
-      if (rawGap > 0.4) {
-        const keepSilence = 0.15;
+      if (rawGap >= 0.18) {
+        const keepSilence = 0.05;
         const skipStart = Number((current.end + keepSilence).toFixed(3));
         const skipEnd = Number((next.start).toFixed(3));
         if (skipEnd > skipStart) {
@@ -438,7 +438,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
     addToast(
       'success',
       'Wordless Silences Shortened',
-      `Underlord registered ${newSkipRanges.length} non-destructive skip intervals (${savedTime.toFixed(1)}s dead air skipped).`
+      `Underlord registered ${newSkipRanges.length} non-destructive skip intervals (${savedTime.toFixed(2)}s dead air skipped).`
     );
   };
 
@@ -954,34 +954,35 @@ export const EditorView: React.FC<EditorViewProps> = ({
           <main id="main-content" tabIndex={-1} className="flex-1 min-h-[140px] overflow-y-auto ios-scroll p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 text-sm leading-relaxed font-sans relative pb-[calc(env(safe-area-inset-bottom)+40px)]">
             {/* Floating Word Action Toolbar on Word Selection */}
             {selectedWord && (
-              <div className="sticky top-0 z-30 mb-2 sm:mb-4 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl ios-glass border border-indigo-500/40 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 text-xs">
+              <div className="sticky top-0 z-30 mb-2 sm:mb-4 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl ios-glass border border-indigo-500/40 shadow-xl flex flex-col gap-1.5 text-xs">
                 <div className="flex items-center justify-between gap-2 px-1">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <span className="font-mono text-[9px] sm:text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 sm:px-2 py-0.5 rounded border border-indigo-800">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <span className="font-mono text-[9px] sm:text-[10px] text-indigo-400 bg-indigo-950/60 px-1.5 sm:px-2 py-0.5 rounded border border-indigo-800 shrink-0">
                       {formatTime(selectedWord.start)}
                     </span>
-                    <span className="font-bold text-white max-w-[120px] sm:max-w-[140px] truncate text-xs sm:text-sm">
+                    <span className="font-bold text-white max-w-[160px] sm:max-w-[220px] truncate text-xs sm:text-sm">
                       "{selectedWord.text}"
                     </span>
                     {selectedWord.deleted && (
-                      <span className="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono">
+                      <span className="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40 font-mono shrink-0">
                         Cut
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => setSelectedWordId(null)}
-                    className="sm:hidden p-1 rounded-lg text-slate-400 hover:text-white min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                    aria-label="Close word selection"
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 min-h-[32px] min-w-[32px] flex items-center justify-center cursor-pointer shrink-0"
                     title="Close selection"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 py-0.5">
                   <button
                     onClick={() => handleStartInlineEdit(selectedWord)}
-                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
+                    className="px-2 sm:px-2.5 py-1.5 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-h-[34px] sm:min-h-[36px] shrink-0"
                     title="Correct spelling without altering audio (C)"
                   >
                     <Type className="w-3.5 h-3.5 text-indigo-400" />
@@ -991,7 +992,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   {selectedWord.deleted ? (
                     <button
                       onClick={() => restoreWord(selectedWord.id)}
-                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
+                      className="px-2 sm:px-2.5 py-1.5 rounded-lg sm:rounded-xl bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-emerald-600/40 transition-colors cursor-pointer min-h-[34px] sm:min-h-[36px] shrink-0"
                       title="Restore cut segment into video"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1000,7 +1001,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   ) : (
                     <button
                       onClick={() => deleteWord(selectedWord.id)}
-                      className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-rose-600/25 text-rose-300 border border-rose-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
+                      className="px-2 sm:px-2.5 py-1.5 rounded-lg sm:rounded-xl bg-rose-600/25 text-rose-300 border border-rose-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-rose-600/40 transition-colors cursor-pointer min-h-[34px] sm:min-h-[36px] shrink-0"
                       title="Cut word from video & skip playback (Delete / Backspace)"
                     >
                       <Scissors className="w-3.5 h-3.5" />
@@ -1016,7 +1017,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                         setIsPlaying(true);
                       }
                     }}
-                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30 min-h-[36px] sm:min-h-[40px] shrink-0"
+                    className="px-2 sm:px-2.5 py-1.5 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer shadow-md shadow-indigo-600/30 min-h-[34px] sm:min-h-[36px] shrink-0"
                     title="Play video from this word"
                   >
                     <Play className="w-3.5 h-3.5" />
@@ -1025,7 +1026,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
 
                   <button
                     onClick={() => setIsVoiceCloningOpen(true)}
-                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-purple-600/25 text-purple-300 border border-purple-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
+                    className="px-2 sm:px-2.5 py-1.5 rounded-lg sm:rounded-xl bg-purple-600/25 text-purple-300 border border-purple-500/40 text-[11px] sm:text-xs font-semibold flex items-center gap-1 sm:gap-1.5 hover:bg-purple-600/40 transition-colors cursor-pointer min-h-[34px] sm:min-h-[36px] shrink-0"
                     title="Synthesize AI voice replacement"
                   >
                     <Mic className="w-3.5 h-3.5" />
@@ -1037,19 +1038,11 @@ export const EditorView: React.FC<EditorViewProps> = ({
                       setCurrentTime(selectedWord.start);
                       setIsCommentsOpen(true);
                     }}
-                    className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-[11px] sm:text-xs font-medium flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-h-[36px] sm:min-h-[40px] shrink-0"
+                    className="px-2 sm:px-2.5 py-1.5 rounded-lg sm:rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-slate-300 text-[11px] sm:text-xs font-medium flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer min-h-[34px] sm:min-h-[36px] shrink-0"
                     title="Leave comment at this word timestamp"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Comment</span>
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedWordId(null)}
-                    className="hidden sm:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer ml-1 min-h-[36px] min-w-[36px] items-center justify-center shrink-0"
-                    title="Close selection"
-                  >
-                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -1412,13 +1405,14 @@ export const EditorView: React.FC<EditorViewProps> = ({
         onClose={() => setIsShareModalOpen(false)}
         project={{
           ...project,
+          silenceSkipRanges,
           comments,
           tracks,
           multicamAngles,
           scenes: [{ ...project.scenes[0], words }],
         }}
         onUpdateShareSettings={(newSettings) => {
-          const updated: Project = { ...project, shareSettings: newSettings, comments, tracks, multicamAngles };
+          const updated: Project = { ...project, shareSettings: newSettings, silenceSkipRanges, comments, tracks, multicamAngles };
           onUpdateProject(updated);
           addToast('success', 'Share Permissions Updated', 'New access settings have been saved.');
         }}

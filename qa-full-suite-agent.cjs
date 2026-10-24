@@ -214,6 +214,12 @@ async function runFullSuiteQA() {
           const restoredClass = await page.$eval('#word-w7', (el) => el.getAttribute('class') || '');
           assert(!restoredClass.includes('line-through'), 'Restored cut word back to active transcript');
         }
+
+        // Verify floating word toolbar has no horizontal overflow on desktop (1280x800)
+        const desktopPillOverflow = await page.$eval('main#main-content .ios-glass', (el) => {
+          return el.scrollWidth > el.clientWidth + 1;
+        });
+        assert(!desktopPillOverflow, 'Desktop floating word action toolbar fits all buttons without horizontal clipping');
       }
     }
 
@@ -277,11 +283,36 @@ async function runFullSuiteQA() {
 
     // Test Silence Shortening in Copilot tab
     const shortenSilencesBtn = await page.$('[role="dialog"] button:has-text("Shorten Wordless Gaps")');
+    assert(shortenSilencesBtn !== null, 'Found "Shorten Wordless Gaps & Silences" button in Underlord');
     if (shortenSilencesBtn) {
       await shortenSilencesBtn.click();
       await page.waitForTimeout(250);
-      const word14StillExists = (await page.$('#word-w14')) !== null;
-      assert(word14StillExists, 'Triggered Shorten Wordless Gaps & Silences in Underlord');
+      const silenceState = await page.evaluate(() => {
+        const saved = JSON.parse(localStorage.getItem('descript_projects_v2') || '[]');
+        const p1 = saved.find((p) => p.id === 'proj-1') || saved[0];
+        const ranges = p1 ? p1.silenceSkipRanges || [] : [];
+        const w38 = p1?.scenes?.[0]?.words?.find((w) => w.id === 'w38');
+        return { count: ranges.length, w38Start: w38 ? w38.start : null };
+      });
+      assert(
+        silenceState.count >= 3 && silenceState.w38Start === 15.2,
+        `Registered ${silenceState.count} non-destructive silence skip intervals while preserving word timestamps (w38.start === ${silenceState.w38Start}s)`
+      );
+
+      // Verify Editor playback automatically skips shortened silence gap [14.95, 15.2]
+      await page.evaluate(() => {
+        const v = document.querySelector('video');
+        if (v) {
+          v.currentTime = 14.98;
+          v.dispatchEvent(new Event('timeupdate'));
+        }
+      });
+      await page.waitForTimeout(150);
+      const editorSilenceSkipped = await page.$eval('video', (v) => v.currentTime);
+      assert(
+        editorSilenceSkipped >= 15.18,
+        `Editor non-destructive playback skipped shortened silence gap (14.98s -> ${editorSilenceSkipped.toFixed(2)}s)`
+      );
     }
 
     // Fillers Tab
@@ -471,12 +502,13 @@ async function runFullSuiteQA() {
       const transModal = await page.waitForSelector('#canvas-transitions-title', { timeout: 3000 });
       assert(transModal !== null, 'Canvas Effects & Transitions modal opened');
 
-      const zoomInEffect = await page.$('[role="dialog"] button:has-text("Zoom In")');
-      if (zoomInEffect) {
-        await zoomInEffect.click();
+      const punchInEffect = await page.$('[role="dialog"] button:has-text("Dynamic Punch-in")');
+      assert(punchInEffect !== null, 'Found "Dynamic Punch-in" transition preset button');
+      if (punchInEffect) {
+        await punchInEffect.click();
         await page.waitForTimeout(150);
-        const zoomClass = await zoomInEffect.getAttribute('class');
-        assert(Boolean(zoomClass && (zoomClass.includes('border-indigo') || zoomClass.includes('border-amber') || zoomClass.includes('bg-'))), 'Selected Zoom In transition effect');
+        const isPressed = await punchInEffect.getAttribute('aria-pressed');
+        assert(isPressed === 'true', 'Selected "Dynamic Punch-in" transition effect (aria-pressed="true")');
       }
 
       await page.screenshot({ path: path.join(SCREENSHOT_DIR, '08_transitions.png') });
@@ -688,7 +720,12 @@ async function runFullSuiteQA() {
     const publicWords = await page.$$('[id^="public-word-"]');
     assert(publicWords.length >= 20, `Public viewway rendered ${publicWords.length} interactive transcript words`);
 
-    // Verify Public Share viewway non-destructive playback skips deleted filler word w12 ([4.4, 4.8])
+    // Verify Public Share transcript search input is visible when allowTranscriptSearch is enabled
+    const publicSearchInput = await page.$('input[placeholder="Search script..."]');
+    const isSearchVisible = publicSearchInput ? await publicSearchInput.isVisible() : false;
+    assert(isSearchVisible, 'Public Share transcript search input is visible');
+
+    // Verify Public Share viewway non-destructive playback skips deleted filler word w12 ([4.4, 4.8]) AND shortened silence ([14.95, 15.2])
     await page.evaluate(() => {
       const v = document.querySelector('video');
       if (v) {
@@ -700,6 +737,20 @@ async function runFullSuiteQA() {
     const shareSkippedTime = await page.$eval('video', (v) => v.currentTime);
     assert(shareSkippedTime >= 4.75, `Public Share viewway automatically skipped deleted word range (4.45s -> ${shareSkippedTime.toFixed(2)}s)`);
 
+    await page.evaluate(() => {
+      const v = document.querySelector('video');
+      if (v) {
+        v.currentTime = 14.98;
+        v.dispatchEvent(new Event('timeupdate'));
+      }
+    });
+    await page.waitForTimeout(150);
+    const shareSilenceSkipped = await page.$eval('video', (v) => v.currentTime);
+    assert(
+      shareSilenceSkipped >= 15.18,
+      `Public Share viewway automatically skipped shortened silence gap (14.98s -> ${shareSilenceSkipped.toFixed(2)}s)`
+    );
+
     // Review drawer
     const reviewBtn = await page.$('button:has-text("Review")');
     if (reviewBtn) {
@@ -707,6 +758,9 @@ async function runFullSuiteQA() {
       await page.waitForTimeout(250);
       const reviewDrawerInput = await page.$('textarea[placeholder*="Leave review note at playhead"]');
       assert(reviewDrawerInput !== null, 'Opened Public Review comments drawer');
+      // Dismiss review drawer with Escape
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(200);
     }
 
     // Test Passcode Protection Gate (rejects wrong passcode, unlocks on valid passcode)
@@ -761,16 +815,20 @@ async function runFullSuiteQA() {
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '16_public_viewway.png') });
 
     // -------------------------------------------------------------
-    // 18. EMBED VIEWWAY (/?embed=proj-1)
+    // 18. EMBED VIEWWAY (/?embed=proj-1&t=6)
     // -------------------------------------------------------------
     console.log('\n--- 18. Testing Embed Player Viewway ---');
-    const embedResponse = await page.goto(`${BASE_URL}/?embed=proj-1`, { waitUntil: 'networkidle' });
+    const embedResponse = await page.goto(`${BASE_URL}/?embed=proj-1&t=6`, { waitUntil: 'networkidle' });
     const embedVideo = await page.waitForSelector('video', { timeout: 5000 });
     assert(embedVideo !== null, 'Embed player <video> element loaded cleanly');
     const xFrameOptions = embedResponse ? embedResponse.headers()['x-frame-options'] : undefined;
     assert(xFrameOptions !== 'SAMEORIGIN' && xFrameOptions !== 'DENY', `Embed endpoint does not block cross-origin iframes (x-frame-options: ${xFrameOptions || 'none'})`);
 
-    // Verify Embed viewway non-destructive playback skips deleted filler word w12 ([4.4, 4.8])
+    // Verify ?t=6 deep link initialized embed player timecode
+    const embedInitialTime = await page.$eval('video', (v) => v.currentTime);
+    assert(Math.abs(embedInitialTime - 6) < 0.5, `Embed viewway respected ?t=6 deep link parameter (currentTime=${embedInitialTime.toFixed(2)}s)`);
+
+    // Verify Embed viewway non-destructive playback skips deleted filler word w12 ([4.4, 4.8]) AND shortened silence ([14.95, 15.2])
     await page.evaluate(() => {
       const v = document.querySelector('video');
       if (v) {
@@ -781,6 +839,20 @@ async function runFullSuiteQA() {
     await page.waitForTimeout(150);
     const embedSkippedTime = await page.$eval('video', (v) => v.currentTime);
     assert(embedSkippedTime >= 4.75, `Embed viewway automatically skipped deleted word range (4.45s -> ${embedSkippedTime.toFixed(2)}s)`);
+
+    await page.evaluate(() => {
+      const v = document.querySelector('video');
+      if (v) {
+        v.currentTime = 14.98;
+        v.dispatchEvent(new Event('timeupdate'));
+      }
+    });
+    await page.waitForTimeout(150);
+    const embedSilenceSkipped = await page.$eval('video', (v) => v.currentTime);
+    assert(
+      embedSilenceSkipped >= 15.18,
+      `Embed viewway automatically skipped shortened silence gap (14.98s -> ${embedSilenceSkipped.toFixed(2)}s)`
+    );
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '17_embed_viewway.png') });
 
@@ -842,7 +914,7 @@ async function runFullSuiteQA() {
         b1.x < b2.x + b2.width &&
         b1.x + b1.width > b2.x &&
         b1.y < b2.y + b2.height &&
-        b1.y + b1.height > b2.y;
+        b1.y + b2.height > b2.y;
       assert(!overlaps, 'Mobile video canvas badges ("AI Eye Contact Locked" and "Studio Sound Active") do not overlap');
     }
 
@@ -857,6 +929,11 @@ async function runFullSuiteQA() {
       await mobilePage.waitForTimeout(300);
       const pill = await mobilePage.$('.ios-glass');
       assert(pill !== null, 'Floating iOS glass word action bar displayed on mobile tap');
+
+      const mobilePillOverflow = await mobilePage.$eval('main#main-content .ios-glass', (el) => {
+        return el.scrollWidth > el.clientWidth + 1;
+      });
+      assert(!mobilePillOverflow, 'Mobile floating word action bar fits all buttons without horizontal clipping');
 
       const mainBox = await mobilePage.$eval('main#main-content', (el) => {
         const rect = el.getBoundingClientRect();

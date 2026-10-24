@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --breakpoint-xs: 375px;
+}
+
 @layer base {
   * {
     border-color: rgba(255, 255, 255, 0.08);

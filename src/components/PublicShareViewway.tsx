@@ -28,6 +28,7 @@ import {
 import { Project, WordToken, CommentItem, CommentReaction } from '../types';
 import { api } from '../utils/apiService';
 import { computeNonDestructiveSkipTarget } from '../utils/exportGenerators';
+import { useModalDismiss } from '../utils/useModalDismiss';
 
 interface PublicShareViewwayProps {
   project: Project;
@@ -66,6 +67,7 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
   const allowComments = project.shareSettings?.allowComments !== false;
   const allowTranscriptSearch = project.shareSettings?.allowTranscriptSearch !== false;
   const [isCommentsOpen, setIsCommentsOpen] = useState(initialTab === 'review' && allowComments);
+  useModalDismiss(isCommentsOpen, () => setIsCommentsOpen(false));
   const [isPasscodeUnlocked, setIsPasscodeUnlocked] = useState(
     project.shareSettings?.accessLevel !== 'passcode'
   );
@@ -700,17 +702,23 @@ export const PublicShareViewway: React.FC<PublicShareViewwayProps> = ({
 
         {/* Collapsible Review & Comments Drawer */}
         {isCommentsOpen && (
-          <div className="w-full sm:w-[360px] fixed sm:relative inset-y-0 right-0 z-40 sm:z-auto border-l border-white/[0.08] bg-[#141824] flex flex-col overflow-hidden animate-slideLeft pt-safe pb-safe sm:pt-0 sm:pb-0 shadow-2xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="public-comments-title"
+            className="w-full sm:w-[360px] fixed sm:relative inset-y-0 right-0 z-40 sm:z-auto border-l border-white/[0.08] bg-[#141824] flex flex-col overflow-hidden animate-slideLeft pt-safe pb-safe sm:pt-0 sm:pb-0 shadow-2xl"
+          >
             {/* Comments Header */}
             <div className="h-12 px-4 border-b border-white/[0.06] flex items-center justify-between bg-[#121622]">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-indigo-400" />
-                <span className="text-xs font-bold text-white">
+                <span id="public-comments-title" className="text-xs font-bold text-white">
                   Review & Feedback ({comments.length})
                 </span>
               </div>
               <button
                 onClick={() => setIsCommentsOpen(false)}
+                aria-label="Close review drawer"
                 className="text-slate-400 hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
